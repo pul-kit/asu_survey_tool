@@ -475,9 +475,9 @@ function renderTable(order, fields) {
     const baseName = sanitizedBase.length > 0 ? sanitizedBase : 'table_export_v3'; // Falls back to a stable name when the user input is empty or sanitizes to nothing.
     downloadText(csv, `${baseName}.csv`); // Initiates a download of the generated CSV file using the computed default name.
   }); // Ends the click handler that exports the table data.
-  const container = document.createElement('div'); // Creates a wrapper div to hold the table and export button together.
-  container.appendChild(table); // Inserts the table into the container.
-  container.appendChild(exportBtn); // Adds the export button below the table.
+  const container = document.createElement('div'); // Creates a wrapper div to hold the export button and table together.
+  container.appendChild(exportBtn); // Inserts the export button first so it appears above the table.
+  container.appendChild(table); // Adds the table below the export control to satisfy the desired layout.
   resultsDiv.appendChild(container); // Displays the assembled table and export control in the results area.
 } // Ends the function that renders the comparison table.
 
