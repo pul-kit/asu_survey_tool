@@ -37,7 +37,7 @@
     th { background:#f7fafc; cursor:grab; } /* Highlights header cells and indicates they can be dragged when sortable. */
     .file-column { display:inline-block; padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #eee; margin-right:6px; } /* Styles each draggable file chip with padding and subtle borders. */
     .controls { display:flex; gap:8px; align-items:center; margin-top:8px; } /* Lays out control buttons horizontally with spacing and alignment. */
-    .graphs { display:flex; flex-direction:column; gap:20px; margin-top:12px; } /* Stacks graph cards vertically with spacing. */
+    .graphs { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:20px; margin-top:12px; } /* Arranges graph cards in a four-column grid with spacing so multiple charts appear side-by-side. */
     .graph-card { border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:white; } /* Gives each graph card a bordered, padded container. */
     .hint { color:#555; font-size:13px; margin-top:6px; } /* Styles hint text with muted color, small size, and spacing. */
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:12px; } /* Arranges the top toolbar items with space between them and bottom margin. */
