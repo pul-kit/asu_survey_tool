@@ -543,10 +543,11 @@ function renderGraphs(order, fields) {
     }
     new Chart(canvas, { type:'bar', data:{labels, datasets:[{label:field, data:dataVals}]}, options:{
       responsive:true, scales:{x:{title:{display:true,text:'Files'}}, y:{title:{display:true,text:'Value'}, beginAtZero:true}}, // Configures axes titles, responsiveness, and baseline behavior for the chart.
-      plugins:{ tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `avg = ${context.formattedValue}`; if(m.type==='non-numeric') return `count = ${context.formattedValue}`; if(m.type==='empty') return `no data`; if(m.type==='missing') return `field not present`; return context.formattedValue; }}}} // Customizes tooltip text to explain how each bar's value was derived.
+      plugins:{ // Introduces plugin-level configuration for the chart instance.
+        legend:{display:false}, // Hides the legend so the clickable text that toggled dataset visibility is removed.
+        tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `avg = ${context.formattedValue}`; if(m.type==='non-numeric') return `count = ${context.formattedValue}`; if(m.type==='empty') return `no data`; if(m.type==='missing') return `field not present`; return context.formattedValue; }}} // Customizes tooltip text to explain how each bar's value was derived.
+      } // Ends the plugins configuration block now that the legend is hidden and tooltips customized.
     }}); // Instantiates a new Chart.js bar chart with the prepared data and configuration.
-    const note=document.createElement('div'); note.className='hint'; note.innerHTML='Note: Graphs aggregate across rows after applying the active filter (same data as the table).'; // Adds a clarifying note about the aggregation behavior below the chart.
-    card.appendChild(note); // Appends the explanatory note to the graph card.
   }
   resultsDiv.appendChild(graphsWrap); // Displays the collection of graphs in the results area.
 } // Ends the function that renders graphs for selected fields.
