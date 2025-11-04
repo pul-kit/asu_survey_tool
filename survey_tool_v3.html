@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Survey CSV Processor & Visualizer (v3)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 20px; color:#111; }
+    h1 { margin:0 0 10px 0; font-size:24px; }
+    .row { display:flex; gap:20px; align-items:flex-start; }
+    .panel { border:1px solid #ddd; border-radius:8px; padding:12px; background:#fafafa; max-height:720px; overflow:auto; }
+    .panel.small { width:300px; }
+    .panel.large { flex:1; min-width:420px; }
+    label { display:block; margin-top:8px; font-weight:600; }
+    input[type="text"], select { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; }
+    button { padding:8px 12px; border-radius:6px; border:1px solid #2b6cb0; background:#3182ce; color:white; cursor:pointer; }
+    button.secondary { background:#edf2f7; color:#333; border:1px solid #cbd5e0; }
+    .files-list { margin-top:8px; font-size:13px; }
+    .checks { max-height:300px; overflow:auto; border:1px dashed #eee; padding:8px; border-radius:6px; background:#fff; }
+    .checks label { font-weight:normal; display:flex; align-items:center; gap:8px; margin:6px 0; }
+    #results { margin-top:12px; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; }
+    th, td { border:1px solid #ddd; padding:8px; text-align:left; vertical-align:top; }
+    th { background:#f7fafc; cursor:grab; }
+    .file-column { display:inline-block; padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #eee; margin-right:6px; }
+    .controls { display:flex; gap:8px; align-items:center; margin-top:8px; }
+    .graphs { display:flex; flex-direction:column; gap:20px; margin-top:12px; }
+    .graph-card { border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:white; }
+    .hint { color:#555; font-size:13px; margin-top:6px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:12px; }
+    .order-hint { font-size:13px; color:#555; margin-top:8px; }
+    .files-order { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <h1>Survey CSV Processor & Visualizer (v3)</h1>
+  <div class="topbar">
+    <div>
+      <strong>Upload many CSV files</strong>
+      <div class="hint">Table cells respect the active filter (column + value). Matched files will show only files containing that value.</div>
+    </div>
+    <div>
+      <input id="fileInput" type="file" accept=".csv,text/csv" multiple />
+      <button id="clearAll" class="secondary">Clear All</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="panel small">
+      <label>Uploaded files</label>
+      <div id="uploadedFiles" class="files-list">No files uploaded.</div>
+
+      <label for="pickColumn">Step 1 — Pick a column to filter files by</label>
+      <select id="pickColumn"><option value="">(upload files to populate)</option></select>
+
+      <label for="columnValue">Step 2 — Enter value to search for in that column</label>
+      <input id="columnValue" type="text" placeholder='Exact match (trimmed). Case-insensitive' />
+
+      <div class="controls">
+        <button id="findFiles">Find files with value</button>
+        <button id="showAllColumns" class="secondary">Show all files</button>
+      </div>
+
+      <label>Step 3 — Pick which fields (rows) to include</label>
+      <div class="checks" id="fieldsList"><div class="hint">No fields available.</div></div>
+
+      <div class="controls">
+        <button id="createTable">Create Table</button>
+        <button id="createGraph">Create Graph</button>
+      </div>
+    </div>
+
+    <div class="panel large">
+      <label>Matched files (orderable)</label>
+      <div class="order-hint">Columns are sorted by YEAR then semester order (SpringA, SpringB, SpringC, SummerA, SummerB, SummerC, FallA, FallB, FallC). You can drag to reorder manually as well.</div>
+      <div id="filesOrder" class="files-order"></div>
+      <div id="results"></div>
+    </div>
+  </div>
+
+<script>
+const semesterOrder = {
+  "SpringA": 0, "SpringB": 1, "SpringC": 2,
+  "SummerA": 3, "SummerB": 4, "SummerC": 5,
+  "FallA": 6, "FallB": 7, "FallC": 8
+};
+function parseFileNameKey(name) {
+  const base = name.replace(/\\.[^/.]+$/, "");
+  const parts = base.split("_");
+  if (parts.length >= 3) {
+    const year = parseInt(parts[0], 10);
+    const semester = parts[1];
+    return {year: isNaN(year)?null:year, semester, fileLabel: base};
+  }
+  const yearMatch = name.match(/(19|20)\\d{2}/);
+  const year = yearMatch ? parseInt(yearMatch[0],10) : null;
+  return {year, semester: null, fileLabel: base};
+}
+function semesterSortKey(a, b) {
+  if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) - (b.year || 0);
+  const aOrd = a.semester && semesterOrder.hasOwnProperty(a.semester) ? semesterOrder[a.semester] : 999;
+  const bOrd = b.semester && semesterOrder.hasOwnProperty(b.semester) ? semesterOrder[b.semester] : 999;
+  if (aOrd !== bOrd) return aOrd - bOrd;
+  if ((a.fileLabel || "") < (b.fileLabel || "")) return -1;
+  if ((a.fileLabel || "") > (b.fileLabel || "")) return 1;
+  return 0;
+}
+
+const filesData = new Map();
+const fileInput = document.getElementById('fileInput');
+const uploadedFiles = document.getElementById('uploadedFiles');
+const pickColumn = document.getElementById('pickColumn');
+const columnValue = document.getElementById('columnValue');
+const findFilesBtn = document.getElementById('findFiles');
+const fieldsList = document.getElementById('fieldsList');
+const createTableBtn = document.getElementById('createTable');
+const createGraphBtn = document.getElementById('createGraph');
+const resultsDiv = document.getElementById('results');
+const filesOrderDiv = document.getElementById('filesOrder');
+const clearAllBtn = document.getElementById('clearAll');
+const showAllBtn = document.getElementById('showAllColumns');
+
+let matchedFiles = [];
+let currentFields = [];
+let selectedFields = new Set();
+let filesOrder = [];
+let sortableFiles = null;
+
+fileInput.addEventListener('change', async (ev) => {
+  const files = Array.from(ev.target.files);
+  if (files.length === 0) return;
+  resultsDiv.innerHTML = '';
+  uploadedFiles.innerHTML = `Parsing ${files.length} file(s)...`;
+  await parseAndProcessFiles(files);
+  uploadedFiles.innerHTML = `<strong>${filesData.size}</strong> file(s) loaded.`;
+  // clear previous matches
+  matchedFiles = [];
+  filesOrderDiv.innerHTML = '';
+  fieldsList.innerHTML = '<div class="hint">No fields available.</div>';
+  populateColumnPicker();
+});
+
+clearAllBtn.addEventListener('click', () => {
+  filesData.clear();
+  matchedFiles = [];
+  currentFields = [];
+  selectedFields.clear();
+  filesOrder = [];
+  pickColumn.innerHTML = '<option value="">(upload files to populate)</option>';
+  uploadedFiles.innerHTML = 'No files uploaded.';
+  fieldsList.innerHTML = '<div class="hint">No fields available.</div>';
+  filesOrderDiv.innerHTML = '';
+  resultsDiv.innerHTML = '';
+  fileInput.value = '';
+});
+
+showAllBtn.addEventListener('click', () => {
+  if (filesData.size === 0) { alert('Upload files first.'); return; }
+  matchedFiles = Array.from(filesData.keys());
+  updateFieldsListFromMatchedFiles();
+  prepareFilesOrder(matchedFiles);
+  uploadedFiles.innerHTML = `${matchedFiles.length} file(s) matched (showing all uploaded files).`;
+});
+
+findFilesBtn.addEventListener('click', () => {
+  if (filesData.size === 0) { alert('Upload files first.'); return; }
+  const col = pickColumn.value;
+  const val = (columnValue.value || "").trim();
+  if (!col) { alert('Pick a column first'); return; }
+  if (!val) { alert('Enter a value to search for'); return; }
+
+  const searchVal = val.toLowerCase();
+  const found = [];
+  for (const [fname, data] of filesData.entries()) {
+    const rows = data.rows;
+    let any = false;
+    for (const r of rows) {
+      const v = (r[col] !== undefined && r[col] !== null) ? String(r[col]).trim().toLowerCase() : "";
+      if (v === searchVal) { any = true; break; }
+    }
+    if (any) found.push(fname);
+  }
+  // update matchedFiles properly and UI
+  matchedFiles = found;
+  if (matchedFiles.length === 0) {
+    // no matches: clear fields and file order and inform user
+    fieldsList.innerHTML = '<div class="hint">No fields available for selected files.</div>';
+    filesOrderDiv.innerHTML = '';
+    resultsDiv.innerHTML = '';
+    uploadedFiles.innerHTML = `0 files matched for "${val}".`;
+    alert('No files contain that value in that column.');
+    return;
+  }
+  // otherwise update lists and order
+  updateFieldsListFromMatchedFiles();
+  prepareFilesOrder(matchedFiles);
+  uploadedFiles.innerHTML = `${matchedFiles.length} file(s) matched for "${val}".`;
+});
+
+function populateColumnPicker() {
+  const union = new Set();
+  for (const d of filesData.values()) {
+    for (const h of d.headers) union.add(h);
+  }
+  const arr = Array.from(union).sort((a,b)=> a.localeCompare(b, undefined, {sensitivity:'base'}));
+  pickColumn.innerHTML = '<option value="">-- pick a column --</option>';
+  for (const h of arr) {
+    const opt = document.createElement('option');
+    opt.value = h;
+    opt.textContent = h;
+    pickColumn.appendChild(opt);
+  }
+}
+
+function updateFieldsListFromMatchedFiles() {
+  currentFields = [];
+  const union = new Set();
+  for (const fname of matchedFiles) {
+    const d = filesData.get(fname);
+    if (!d) continue;
+    for (const h of d.headers) union.add(h);
+  }
+  currentFields = Array.from(union).sort((a,b)=> a.localeCompare(b, undefined, {sensitivity:'base'}));
+  if (currentFields.length === 0) {
+    fieldsList.innerHTML = '<div class="hint">No fields available for selected files.</div>';
+    return;
+  }
+  fieldsList.innerHTML = '';
+  selectedFields.clear();
+  for (const h of currentFields) {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.value = h;
+    cb.addEventListener('change', (ev) => {
+      if (cb.checked) selectedFields.add(h); else selectedFields.delete(h);
+    });
+    lbl.appendChild(cb);
+    const span = document.createElement('span');
+    span.textContent = h;
+    lbl.appendChild(span);
+    fieldsList.appendChild(lbl);
+    selectedFields.add(h);
+  }
+}
+
+function prepareFilesOrder(fileKeys) {
+  const parsed = fileKeys.map(k => ({key:k, parsed: filesData.get(k).parsedName || parseFileNameKey(k)}));
+  parsed.sort((x,y) => semesterSortKey(x.parsed, y.parsed));
+  filesOrder = parsed.map(x => x.key);
+  filesOrderDiv.innerHTML = '';
+  for (const k of filesOrder) {
+    const el = document.createElement('div');
+    el.className = 'file-column';
+    el.textContent = k;
+    el.dataset.key = k;
+    filesOrderDiv.appendChild(el);
+  }
+  if (sortableFiles) sortableFiles.destroy();
+  sortableFiles = new Sortable(filesOrderDiv, {
+    animation: 150,
+    onEnd: (evt) => {
+      const children = Array.from(filesOrderDiv.children);
+      filesOrder = children.map(ch => ch.dataset.key);
+    }
+  });
+}
+
+async function parseAndProcessFiles(fileList) {
+  filesData.clear();
+  for (const f of fileList) {
+    await new Promise((res, rej) => {
+      Papa.parse(f, {
+        skipEmptyLines: false,
+        complete: function(results) {
+          try {
+            const arr = results.data.map(row => row.map(cell => cell === undefined ? '' : cell));
+            let maxNonEmpty = -1;
+            for (let i=0;i<arr.length;i++) {
+              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0);
+              if (nonEmpty > maxNonEmpty) maxNonEmpty = nonEmpty;
+            }
+            let headerRowIndex = null;
+            for (let i=0;i<arr.length;i++) {
+              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0);
+              if (nonEmpty === maxNonEmpty) { headerRowIndex = i; break; }
+            }
+            if (headerRowIndex === null) headerRowIndex = 0;
+            const rawHeader = arr[headerRowIndex].map(h => String(h || '').trim());
+            const dataRows = arr.slice(headerRowIndex+1);
+            const mappedRows = dataRows.map(r => {
+              const obj = {};
+              for (let i=0;i<rawHeader.length;i++) obj[rawHeader[i]] = (i < r.length) ? r[i] : '';
+              return obj;
+            });
+            const statusColName = rawHeader.find(h => h.toLowerCase() === 'response status');
+            let filteredRows = mappedRows;
+            if (statusColName) {
+              filteredRows = mappedRows.filter(r => {
+                const v = (r[statusColName] || '').toString().trim();
+                return v.toLowerCase() === 'completed';
+              });
+            }
+            const finalHeaders = [];
+            for (const h of rawHeader) {
+              const anyData = filteredRows.some(r => {
+                const v = r[h];
+                return v !== undefined && v !== null && String(v).trim() !== '';
+              });
+              if (anyData) finalHeaders.push(h);
+            }
+            const hasFirst = finalHeaders.find(h => h.toLowerCase() === 'first name');
+            const hasLast = finalHeaders.find(h => h.toLowerCase() === 'last name');
+            if (hasFirst || hasLast) {
+              if (!finalHeaders.includes('Full Name')) finalHeaders.push('Full Name');
+              filteredRows = filteredRows.map(r => {
+                const f = hasFirst ? (r[hasFirst] || '') : '';
+                const l = hasLast ? (r[hasLast] || '') : '';
+                r['Full Name'] = (String(f).trim() + ' ' + String(l).trim()).trim().toLowerCase();
+                return r;
+              });
+            }
+            const cleanedRows = filteredRows.map(r => {
+              const obj = {};
+              for (const h of finalHeaders) obj[h] = r[h] !== undefined ? r[h] : '';
+              return obj;
+            });
+            const parsedName = parseFileNameKey(f.name);
+            filesData.set(f.name, { filename: f.name, headers: finalHeaders, rows: cleanedRows, originalHeader: rawHeader, parsedName });
+            res();
+          } catch(err) { console.error(err); rej(err); }
+        },
+        error: function(err) { rej(err); }
+      });
+    });
+  }
+}
+
+function renderTable(order, fields) {
+  resultsDiv.innerHTML = '';
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const thr = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.textContent = 'Field \\ File';
+  thr.appendChild(corner);
+  for (const k of order) {
+    const th = document.createElement('th');
+    th.textContent = k;
+    thr.appendChild(th);
+  }
+  thead.appendChild(thr);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+
+  const filterCol = pickColumn.value;
+  const filterVal = (columnValue.value||"").trim().toLowerCase();
+
+  for (const field of fields) {
+    const tr = document.createElement('tr');
+    const rlabel = document.createElement('td');
+    rlabel.textContent = field;
+    tr.appendChild(rlabel);
+    for (const k of order) {
+      const td = document.createElement('td');
+      const d = filesData.get(k);
+      if (!d) { td.textContent=''; tr.appendChild(td); continue; }
+      if (!d.headers.includes(field)) { td.textContent=''; tr.appendChild(td); continue; }
+      let rowsToUse = d.rows;
+      if (filterCol && filterVal) {
+        rowsToUse = d.rows.filter(r => {
+          const v = (r[filterCol] || "").toString().trim().toLowerCase();
+          return v === filterVal;
+        });
+      }
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!=='');
+      const unique = Array.from(new Set(values));
+      td.textContent = unique.join(' | ');
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  const exportBtn = document.createElement('button');
+  exportBtn.textContent = 'Export table as CSV';
+  exportBtn.addEventListener('click', ()=> {
+    const csv = tableToCSV(order, fields);
+    downloadText(csv, 'table_export_v3.csv');
+  });
+  const container = document.createElement('div');
+  container.appendChild(table);
+  container.appendChild(exportBtn);
+  resultsDiv.appendChild(container);
+}
+
+function tableToCSV(order, fields) {
+  const lines=[];
+  const header=['Field/File', ...order];
+  lines.push(header.map(csvEscape).join(','));
+  const filterCol = pickColumn.value;
+  const filterVal = (columnValue.value||"").trim().toLowerCase();
+  for (const field of fields) {
+    const row=[field];
+    for (const k of order) {
+      const d = filesData.get(k);
+      if (!d || !d.headers.includes(field)) { row.push(''); continue; }
+      let rowsToUse = d.rows;
+      if (filterCol && filterVal) {
+        rowsToUse = d.rows.filter(r => {
+          const v = (r[filterCol] || "").toString().trim().toLowerCase();
+          return v === filterVal;
+        });
+      }
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!=='');
+      const unique = Array.from(new Set(values));
+      row.push(unique.join(' | '));
+    }
+    lines.push(row.map(csvEscape).join(','));
+  }
+  return lines.join('\n');
+}
+function csvEscape(s) {
+  if (s==null) return '';
+  s=String(s);
+  if (s.includes(',')||s.includes('"')||s.includes('\n')) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function downloadText(text, filename) {
+  const blob = new Blob([text], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function renderGraphs(order, fields) {
+  resultsDiv.innerHTML='';
+  const graphsWrap=document.createElement('div'); graphsWrap.className='graphs';
+  for (const field of fields) {
+    const card=document.createElement('div'); card.className='graph-card';
+    const title=document.createElement('div'); title.innerHTML=`<strong>${field}</strong>`; card.appendChild(title);
+    const canvas=document.createElement('canvas'); canvas.style.maxWidth='100%'; card.appendChild(canvas);
+    graphsWrap.appendChild(card);
+    const labels=[]; const dataVals=[]; const meta=[];
+    for (const k of order) {
+      labels.push(k);
+      const d = filesData.get(k);
+      if (!d || !d.headers.includes(field)) { dataVals.push(null); meta.push({type:'missing'}); continue;}
+      const values = d.rows.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!=='');
+      if (values.length===0) { dataVals.push(null); meta.push({type:'empty'}); continue; }
+      const numeric = values.map(v=>Number(v)).filter(v=>!Number.isNaN(v));
+      if (numeric.length===values.length) {
+        const avg = numeric.reduce((a,b)=>a+b,0)/numeric.length;
+        dataVals.push(Number.parseFloat(avg.toFixed(4))); meta.push({type:'numeric',agg:'avg'});
+      } else { dataVals.push(values.length); meta.push({type:'non-numeric',agg:'count'}); }
+    }
+    new Chart(canvas, { type:'bar', data:{labels, datasets:[{label:field, data:dataVals}]}, options:{
+      responsive:true, scales:{x:{title:{display:true,text:'Files'}}, y:{title:{display:true,text:'Value'}, beginAtZero:true}},
+      plugins:{ tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `avg = ${context.formattedValue}`; if(m.type==='non-numeric') return `count = ${context.formattedValue}`; if(m.type==='empty') return `no data`; if(m.type==='missing') return `field not present`; return context.formattedValue; }}}}
+    }});
+    const note=document.createElement('div'); note.className='hint'; note.innerHTML='Note: Graphs aggregate across file rows (not filtered).';
+    card.appendChild(note);
+  }
+  resultsDiv.appendChild(graphsWrap);
+}
+
+// Attach create buttons after functions declared
+createTableBtn.addEventListener('click', ()=> {
+  if (matchedFiles.length === 0) { alert('No matched files (use Find files or Show all files).'); return; }
+  const selected = Array.from(selectedFields);
+  if (selected.length === 0) { alert('Select at least one field.'); return; }
+  renderTable(filesOrder.slice(), selected);
+});
+createGraphBtn.addEventListener('click', ()=> {
+  if (matchedFiles.length === 0) { alert('No matched files (use Find files or Show all files).'); return; }
+  const selected = Array.from(selectedFields);
+  if (selected.length === 0) { alert('Select at least one field.'); return; }
+  renderGraphs(filesOrder.slice(), selected);
+});
+</script>
+</body>
+</html>
