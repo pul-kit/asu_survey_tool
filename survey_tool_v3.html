@@ -519,6 +519,8 @@ function downloadText(text, filename) {
 function renderGraphs(order, fields) {
   resultsDiv.innerHTML=''; // Clears previous results before drawing graphs.
   const graphsWrap=document.createElement('div'); graphsWrap.className='graphs'; // Creates a container for all graph cards and applies styling.
+  const filterCol = pickColumn.value; // Reads the currently selected filter column to mirror the table's filtering.
+  const filterVal = (columnValue.value||"").trim().toLowerCase(); // Normalizes the filter value for consistent comparisons just like the table view uses.
   for (const field of fields) {
     const card=document.createElement('div'); card.className='graph-card'; // Builds a card element to house each individual chart.
     const title=document.createElement('div'); title.innerHTML=`<strong>${field}</strong>`; card.appendChild(title); // Adds a bold title showing the field being visualized.
@@ -529,8 +531,15 @@ function renderGraphs(order, fields) {
       labels.push(k); // Adds the filename to the chart labels array.
       const d = filesData.get(k); // Retrieves parsed data for the current file.
       if (!d || !d.headers.includes(field)) { dataVals.push(null); meta.push({type:'missing'}); continue;} // Records a null data point when the field is absent and notes the missing status.
-      const values = d.rows.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed values for the field from all rows.
-      if (values.length===0) { dataVals.push(null); meta.push({type:'empty'}); continue; } // Marks the data as empty when no non-blank values exist.
+      let rowsToUse = d.rows; // Starts with all rows from the file before applying any optional filtering.
+      if (filterCol && filterVal) {
+        rowsToUse = d.rows.filter(r => { // Narrows the rows down to those matching the active table filter.
+          const v = (r[filterCol] || "").toString().trim().toLowerCase(); // Normalizes the comparison value from the filter column for this row.
+          return v === filterVal; // Keeps only rows whose filter column value matches the requested filter.
+        }); // Ends the filter that enforces consistency with the table data set.
+      }
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed values for the field from the filtered rows only.
+      if (values.length===0) { dataVals.push(null); meta.push({type:'empty'}); continue; } // Marks the data as empty when no non-blank values exist after filtering.
       const numeric = values.map(v=>Number(v)).filter(v=>!Number.isNaN(v)); // Attempts to convert all values to numbers, keeping only valid conversions.
       if (numeric.length===values.length) {
         const avg = numeric.reduce((a,b)=>a+b,0)/numeric.length; // Computes the average of numeric values when all entries are numeric.
@@ -541,7 +550,7 @@ function renderGraphs(order, fields) {
       responsive:true, scales:{x:{title:{display:true,text:'Files'}}, y:{title:{display:true,text:'Value'}, beginAtZero:true}}, // Configures axes titles, responsiveness, and baseline behavior for the chart.
       plugins:{ tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `avg = ${context.formattedValue}`; if(m.type==='non-numeric') return `count = ${context.formattedValue}`; if(m.type==='empty') return `no data`; if(m.type==='missing') return `field not present`; return context.formattedValue; }}}} // Customizes tooltip text to explain how each bar's value was derived.
     }}); // Instantiates a new Chart.js bar chart with the prepared data and configuration.
-    const note=document.createElement('div'); note.className='hint'; note.innerHTML='Note: Graphs aggregate across file rows (not filtered).'; // Adds a clarifying note about the aggregation behavior below the chart.
+    const note=document.createElement('div'); note.className='hint'; note.innerHTML='Note: Graphs aggregate across rows after applying the active filter (same data as the table).'; // Adds a clarifying note about the aggregation behavior below the chart.
     card.appendChild(note); // Appends the explanatory note to the graph card.
   }
   resultsDiv.appendChild(graphsWrap); // Displays the collection of graphs in the results area.
