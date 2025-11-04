@@ -25,7 +25,7 @@
     .panel.small { width:300px; } /* Sets a fixed width for the smaller sidebar panel. */
     .panel.large { flex:1; min-width:420px; } /* Allows the main panel to grow while keeping a minimum width for readability. */
     label { display:block; margin-top:8px; font-weight:600; } /* Places form labels on their own lines with spacing and bold text. */
-    input[type="text"], select { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; } /* Makes text inputs and dropdowns full width with comfortable padding and subtle borders. */
+    input[type="text"], select { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; box-sizing:border-box; } /* Makes text inputs and dropdowns fill the panel without exceeding its width by including padding and borders in the total size. */
     button { padding:8px 12px; border-radius:6px; border:1px solid #2b6cb0; background:#3182ce; color:white; cursor:pointer; } /* Styles primary buttons with blue coloring, rounded corners, and a pointer cursor. */
     button.secondary { background:#edf2f7; color:#333; border:1px solid #cbd5e0; } /* Defines the appearance of secondary buttons with muted colors. */
     .files-list { margin-top:8px; font-size:13px; } /* Adds spacing and smaller text for the uploaded files status area. */
