@@ -424,20 +424,45 @@ async function parseAndProcessFiles(fileList) {
             }
             const hasFirst = finalHeaders.find(h => h.toLowerCase() === 'first name'); // Detects if a "First Name" column remains after filtering.
             const hasLast = finalHeaders.find(h => h.toLowerCase() === 'last name'); // Detects if a "Last Name" column remains after filtering.
-            if (hasFirst || hasLast) {
-              if (!finalHeaders.includes('Full Name')) finalHeaders.push('Full Name'); // Ensures a synthesized Full Name column is available when first or last names exist.
-              filteredRows = filteredRows.map(r => {
-                const f = hasFirst ? (r[hasFirst] || '') : ''; // Retrieves the first-name value when present.
-                const l = hasLast ? (r[hasLast] || '') : ''; // Retrieves the last-name value when present.
-                r['Full Name'] = (String(f).trim() + ' ' + String(l).trim()).trim().toLowerCase(); // Builds a normalized full-name string for consistent comparison.
-                return r; // Returns the augmented row object including the Full Name field.
-              }); // Ends the mapping that adds a Full Name column for matching purposes.
-            }
-            const cleanedRows = filteredRows.map(r => {
-              const obj = {}; // Prepares a new object limited to headers that still contain data.
-              for (const h of finalHeaders) obj[h] = r[h] !== undefined ? r[h] : ''; // Copies values for each retained header, defaulting missing entries to empty strings.
-              return obj; // Returns the cleaned row object.
-            }); // Ends the transformation that strips unused columns.
+              if (hasFirst || hasLast) {
+                if (!finalHeaders.includes('Full Name')) finalHeaders.push('Full Name'); // Ensures a synthesized Full Name column is available when first or last names exist.
+                filteredRows = filteredRows.map(r => {
+                  const f = hasFirst ? (r[hasFirst] || '') : ''; // Retrieves the first-name value when present.
+                  const l = hasLast ? (r[hasLast] || '') : ''; // Retrieves the last-name value when present.
+                  r['Full Name'] = (String(f).trim() + ' ' + String(l).trim()).trim().toLowerCase(); // Builds a normalized full-name string for consistent comparison.
+                  return r; // Returns the augmented row object including the Full Name field.
+                }); // Ends the mapping that adds a Full Name column for matching purposes.
+              }
+              const groupingSource = finalHeaders.slice(); // Creates a shallow copy of the finalized headers so pattern scanning is unaffected by later additions.
+              const letterBuckets = new Map(); // Prepares a map that will group headers by their leading letter when they match the Alphabet-Number pattern.
+              const patternAlphaDashNumber = /^([A-Za-z])-\d+/; // Defines the regular expression that identifies headers beginning with a single letter followed by a dash and at least one digit.
+              for (const headerName of groupingSource) { // Iterates over each header in the copied list to detect matches for the desired pattern.
+                const match = patternAlphaDashNumber.exec(headerName); // Attempts to extract the leading letter from headers conforming to the Alphabet-Number structure.
+                if (!match) continue; // Skips headers that do not follow the targeted pattern.
+                const letterKey = match[1].toUpperCase(); // Normalizes the captured letter to uppercase so grouping remains case-insensitive.
+                if (!letterBuckets.has(letterKey)) letterBuckets.set(letterKey, []); // Initializes a bucket for the letter when encountered for the first time.
+                letterBuckets.get(letterKey).push(headerName); // Records the header under its corresponding letter bucket for later aggregation.
+              } // Concludes the scan that organizes headers by their Alphabet-Number prefix.
+              for (const [letterKey, columnNames] of letterBuckets.entries()) { // Processes each grouped letter along with the headers that share its prefix.
+                if (columnNames.length === 0) continue; // Ignores unexpectedly empty groups to avoid dividing by zero.
+                const totalHeaderName = `${letterKey}-Total`; // Constructs the name of the computed column that will hold the averaged value for this letter group.
+                if (!finalHeaders.includes(totalHeaderName)) finalHeaders.push(totalHeaderName); // Adds the computed column to the header list so it is retained in downstream datasets.
+                for (const row of filteredRows) { // Iterates through every row to compute the average contribution for the grouped columns.
+                  let runningSum = 0; // Initializes an accumulator to sum the numeric values for the group within the current row.
+                  for (const colName of columnNames) { // Steps through each original column belonging to the current letter grouping.
+                    const rawValue = row[colName]; // Retrieves the raw value stored for the current contributing column.
+                    const numericValue = Number(String(rawValue ?? '').trim()); // Converts the value into a number while safely handling undefined or blank cells.
+                    runningSum += Number.isNaN(numericValue) ? 0 : numericValue; // Adds the numeric value to the accumulator, treating non-numeric conversions as zero.
+                  } // Completes accumulation over all contributing columns for this row.
+                  const averageValue = columnNames.length > 0 ? runningSum / columnNames.length : 0; // Calculates the mean by dividing the sum by the number of contributing columns.
+                  row[totalHeaderName] = averageValue; // Stores the computed average back onto the row under the new total column name.
+                } // Ends the per-row computation for the current letter bucket.
+              } // Finalizes the creation of averaged total columns for every detected letter grouping.
+              const cleanedRows = filteredRows.map(r => {
+                const obj = {}; // Prepares a new object limited to headers that still contain data.
+                for (const h of finalHeaders) obj[h] = r[h] !== undefined ? r[h] : ''; // Copies values for each retained header, defaulting missing entries to empty strings.
+                return obj; // Returns the cleaned row object.
+              }); // Ends the transformation that strips unused columns.
             const parsedName = parseFileNameKey(f.name); // Parses the filename to collect metadata for ordering and display.
             filesData.set(f.name, { filename: f.name, headers: finalHeaders, rows: cleanedRows, originalHeader: rawHeader, parsedName }); // Stores all relevant processed data keyed by the original filename.
             res(); // Resolves the promise to indicate the file finished processing successfully.
