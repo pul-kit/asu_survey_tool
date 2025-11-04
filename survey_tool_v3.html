@@ -1,486 +1,565 @@
+<!-- Declares the document as HTML5 for modern parsing and standards compliance. -->
 <!doctype html>
+<!-- Opens the root HTML element and states that the content language is English for accessibility and search engines. -->
 <html lang="en">
+<!-- Begins the head section where metadata, linked resources, and styles are defined. -->
 <head>
+  <!-- Sets the character encoding to UTF-8 so the page correctly displays a wide range of characters. -->
   <meta charset="utf-8" />
+  <!-- Defines the title shown on the browser tab for user identification of the page. -->
   <title>Survey CSV Processor & Visualizer (v3)</title>
+  <!-- Ensures the viewport scales content appropriately on mobile devices by matching screen width and disabling default zoom. -->
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Loads PapaParse from a CDN to provide CSV parsing capabilities in the browser. -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- Loads Chart.js from a CDN to enable data visualization rendering inside canvas elements. -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Loads SortableJS from a CDN so the user can drag and reorder matched file columns. -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <!-- Introduces an inline style block that defines all layout and appearance rules for the interface. -->
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 20px; color:#111; }
-    h1 { margin:0 0 10px 0; font-size:24px; }
-    .row { display:flex; gap:20px; align-items:flex-start; }
-    .panel { border:1px solid #ddd; border-radius:8px; padding:12px; background:#fafafa; max-height:720px; overflow:auto; }
-    .panel.small { width:300px; }
-    .panel.large { flex:1; min-width:420px; }
-    label { display:block; margin-top:8px; font-weight:600; }
-    input[type="text"], select { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; }
-    button { padding:8px 12px; border-radius:6px; border:1px solid #2b6cb0; background:#3182ce; color:white; cursor:pointer; }
-    button.secondary { background:#edf2f7; color:#333; border:1px solid #cbd5e0; }
-    .files-list { margin-top:8px; font-size:13px; }
-    .checks { max-height:300px; overflow:auto; border:1px dashed #eee; padding:8px; border-radius:6px; background:#fff; }
-    .checks label { font-weight:normal; display:flex; align-items:center; gap:8px; margin:6px 0; }
-    #results { margin-top:12px; }
-    table { width:100%; border-collapse:collapse; margin-top:12px; }
-    th, td { border:1px solid #ddd; padding:8px; text-align:left; vertical-align:top; }
-    th { background:#f7fafc; cursor:grab; }
-    .file-column { display:inline-block; padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #eee; margin-right:6px; }
-    .controls { display:flex; gap:8px; align-items:center; margin-top:8px; }
-    .graphs { display:flex; flex-direction:column; gap:20px; margin-top:12px; }
-    .graph-card { border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:white; }
-    .hint { color:#555; font-size:13px; margin-top:6px; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:12px; }
-    .order-hint { font-size:13px; color:#555; margin-top:8px; }
-    .files-order { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
-  </style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 20px; color:#111; } /* Styles the overall page with readable system fonts, outer spacing, and dark text. */
+    h1 { margin:0 0 10px 0; font-size:24px; } /* Gives the main heading spacing below and an emphasized font size. */
+    .row { display:flex; gap:20px; align-items:flex-start; } /* Aligns child panels horizontally with spacing and top alignment. */
+    .panel { border:1px solid #ddd; border-radius:8px; padding:12px; background:#fafafa; max-height:720px; overflow:auto; } /* Styles each panel with a soft border, rounded corners, padding, light background, and scrollable overflow. */
+    .panel.small { width:300px; } /* Sets a fixed width for the smaller sidebar panel. */
+    .panel.large { flex:1; min-width:420px; } /* Allows the main panel to grow while keeping a minimum width for readability. */
+    label { display:block; margin-top:8px; font-weight:600; } /* Places form labels on their own lines with spacing and bold text. */
+    input[type="text"], select { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; } /* Makes text inputs and dropdowns full width with comfortable padding and subtle borders. */
+    button { padding:8px 12px; border-radius:6px; border:1px solid #2b6cb0; background:#3182ce; color:white; cursor:pointer; } /* Styles primary buttons with blue coloring, rounded corners, and a pointer cursor. */
+    button.secondary { background:#edf2f7; color:#333; border:1px solid #cbd5e0; } /* Defines the appearance of secondary buttons with muted colors. */
+    .files-list { margin-top:8px; font-size:13px; } /* Adds spacing and smaller text for the uploaded files status area. */
+    .checks { max-height:300px; overflow:auto; border:1px dashed #eee; padding:8px; border-radius:6px; background:#fff; } /* Creates a scrollable list for field checkboxes with a dashed border and padding. */
+    .checks label { font-weight:normal; display:flex; align-items:center; gap:8px; margin:6px 0; } /* Styles each checkbox label as a flex row with spacing between the checkbox and text. */
+    #results { margin-top:12px; } /* Provides space above the results output area. */
+    table { width:100%; border-collapse:collapse; margin-top:12px; } /* Makes generated tables span the container, remove double borders, and add top spacing. */
+    th, td { border:1px solid #ddd; padding:8px; text-align:left; vertical-align:top; } /* Gives table cells borders, internal padding, and consistent alignment. */
+    th { background:#f7fafc; cursor:grab; } /* Highlights header cells and indicates they can be dragged when sortable. */
+    .file-column { display:inline-block; padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #eee; margin-right:6px; } /* Styles each draggable file chip with padding and subtle borders. */
+    .controls { display:flex; gap:8px; align-items:center; margin-top:8px; } /* Lays out control buttons horizontally with spacing and alignment. */
+    .graphs { display:flex; flex-direction:column; gap:20px; margin-top:12px; } /* Stacks graph cards vertically with spacing. */
+    .graph-card { border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:white; } /* Gives each graph card a bordered, padded container. */
+    .hint { color:#555; font-size:13px; margin-top:6px; } /* Styles hint text with muted color, small size, and spacing. */
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:12px; } /* Arranges the top toolbar items with space between them and bottom margin. */
+    .order-hint { font-size:13px; color:#555; margin-top:8px; } /* Formats explanatory text near the file order area. */
+    .files-order { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; } /* Arranges file chips in a wrap-around flex layout with spacing. */
+  </style> <!-- Ends the CSS definitions for the page. -->
 </head>
+<!-- Begins the visible portion of the document presented to the user. -->
 <body>
+  <!-- Displays the main page heading identifying the application. -->
   <h1>Survey CSV Processor & Visualizer (v3)</h1>
+  <!-- Creates a horizontal container for the introductory instructions and file controls. -->
   <div class="topbar">
+    <!-- Wraps the instructional text explaining how the tool behaves. -->
     <div>
+      <!-- Highlights the directive to upload multiple CSV files. -->
       <strong>Upload many CSV files</strong>
+      <!-- Provides a note explaining how filters affect displayed table cells. -->
       <div class="hint">Table cells respect the active filter (column + value). Matched files will show only files containing that value.</div>
     </div>
+    <!-- Groups the file input and clear button controls. -->
     <div>
+      <!-- Offers a file picker allowing multiple CSV files to be selected at once. -->
       <input id="fileInput" type="file" accept=".csv,text/csv" multiple />
+      <!-- Provides a secondary button to remove all uploaded data and reset the interface. -->
       <button id="clearAll" class="secondary">Clear All</button>
     </div>
   </div>
 
+  <!-- Sets up the main two-column layout containing sidebar controls and results. -->
   <div class="row">
+    <!-- Defines the sidebar panel with inputs for filtering and selecting fields. -->
     <div class="panel small">
+      <!-- Labels the uploaded file summary list. -->
       <label>Uploaded files</label>
+      <!-- Displays status text about currently loaded files. -->
       <div id="uploadedFiles" class="files-list">No files uploaded.</div>
 
+      <!-- Introduces the column-selection step for filtering files. -->
       <label for="pickColumn">Step 1 — Pick a column to filter files by</label>
+      <!-- Provides the dropdown that will be populated with column names from uploaded data. -->
       <select id="pickColumn"><option value="">(upload files to populate)</option></select>
 
+      <!-- Introduces the value entry step used to match rows in the chosen column. -->
       <label for="columnValue">Step 2 — Enter value to search for in that column</label>
+      <!-- Supplies a text input for the user to type the value they want to match within the selected column. -->
       <input id="columnValue" type="text" placeholder='Exact match (trimmed). Case-insensitive' />
 
+      <!-- Groups the action buttons that trigger filtering operations. -->
       <div class="controls">
+        <!-- Button to find files containing the entered value in the selected column. -->
         <button id="findFiles">Find files with value</button>
+        <!-- Button to reset filters and show all uploaded files. -->
         <button id="showAllColumns" class="secondary">Show all files</button>
       </div>
 
+      <!-- Labels the step for choosing which data fields to include in outputs. -->
       <label>Step 3 — Pick which fields (rows) to include</label>
+      <!-- Container that will be filled with checkboxes representing available fields from matched files. -->
       <div class="checks" id="fieldsList"><div class="hint">No fields available.</div></div>
 
+      <!-- Groups the buttons that generate tables or graphs from the selected data. -->
       <div class="controls">
+        <!-- Button to create a tabular view of the selected fields across matched files. -->
         <button id="createTable">Create Table</button>
+        <!-- Button to generate visual graphs from the selected data fields. -->
         <button id="createGraph">Create Graph</button>
       </div>
     </div>
 
+    <!-- Defines the main panel that shows matched files, their order, and resulting outputs. -->
     <div class="panel large">
+      <!-- Labels the area where matched files are listed and can be reordered. -->
       <label>Matched files (orderable)</label>
+      <!-- Explains the default sorting logic and drag-and-drop capability for file columns. -->
       <div class="order-hint">Columns are sorted by YEAR then semester order (SpringA, SpringB, SpringC, SummerA, SummerB, SummerC, FallA, FallB, FallC). You can drag to reorder manually as well.</div>
+      <!-- Holds the draggable chips representing matched files. -->
       <div id="filesOrder" class="files-order"></div>
+      <!-- Placeholder where generated tables or charts will be inserted. -->
       <div id="results"></div>
     </div>
   </div>
 
+<!-- Starts the script block containing all interactive logic for the tool. -->
 <script>
+// Defines a mapping that assigns numeric order values to semester labels for consistent sorting.
 const semesterOrder = {
-  "SpringA": 0, "SpringB": 1, "SpringC": 2,
-  "SummerA": 3, "SummerB": 4, "SummerC": 5,
-  "FallA": 6, "FallB": 7, "FallC": 8
-};
+  "SpringA": 0, // Maps the SpringA semester to the earliest sort position.
+  "SpringB": 1, // Maps SpringB to follow SpringA when sorting.
+  "SpringC": 2, // Maps SpringC to the third spring slot in the order.
+  "SummerA": 3, // Assigns the first summer term a position after the spring terms.
+  "SummerB": 4, // Assigns the second summer term the next sequential position.
+  "SummerC": 5, // Assigns the third summer term to follow SummerB.
+  "FallA": 6, // Places the first fall term after all spring and summer entries.
+  "FallB": 7, // Places the second fall term after FallA.
+  "FallC": 8 // Places the final fall term at the end of the order list.
+}; // Closes the semester ordering configuration object.
+// Parses a filename into year and semester components to assist in sorting.
 function parseFileNameKey(name) {
-  const base = name.replace(/\\.[^/.]+$/, "");
-  const parts = base.split("_");
-  if (parts.length >= 3) {
-    const year = parseInt(parts[0], 10);
-    const semester = parts[1];
-    return {year: isNaN(year)?null:year, semester, fileLabel: base};
+  const base = name.replace(/\.[^/.]+$/, ""); // Removes the file extension to analyze the core filename.
+  const parts = base.split("_"); // Splits the base name on underscores to inspect structured naming conventions.
+  if (parts.length >= 3) { // Checks if the filename appears to follow the YEAR_SEMESTER pattern.
+    const year = parseInt(parts[0], 10); // Attempts to interpret the first segment as a numeric year.
+    const semester = parts[1]; // Treats the second segment as the semester label.
+    return {year: isNaN(year)?null:year, semester, fileLabel: base}; // Returns parsed metadata including a sanitized year and the base label.
   }
-  const yearMatch = name.match(/(19|20)\\d{2}/);
-  const year = yearMatch ? parseInt(yearMatch[0],10) : null;
-  return {year, semester: null, fileLabel: base};
-}
+  const yearMatch = name.match(/(19|20)\d{2}/); // Searches for any four-digit year starting with 19 or 20 within the filename.
+  const year = yearMatch ? parseInt(yearMatch[0],10) : null; // Extracts and parses the matched year if present.
+  return {year, semester: null, fileLabel: base}; // Falls back to returning the base label with only year information when semester is absent.
+} // Ends the helper that derives sorting metadata from filenames.
+// Determines the correct ordering between two parsed filename records using year, semester, and name fallback.
 function semesterSortKey(a, b) {
-  if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) - (b.year || 0);
-  const aOrd = a.semester && semesterOrder.hasOwnProperty(a.semester) ? semesterOrder[a.semester] : 999;
-  const bOrd = b.semester && semesterOrder.hasOwnProperty(b.semester) ? semesterOrder[b.semester] : 999;
-  if (aOrd !== bOrd) return aOrd - bOrd;
-  if ((a.fileLabel || "") < (b.fileLabel || "")) return -1;
-  if ((a.fileLabel || "") > (b.fileLabel || "")) return 1;
-  return 0;
-}
+  if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) - (b.year || 0); // Primarily sorts by year, handling null years as zero.
+  const aOrd = a.semester && semesterOrder.hasOwnProperty(a.semester) ? semesterOrder[a.semester] : 999; // Resolves the numeric order for the first semester or defaults to a large value.
+  const bOrd = b.semester && semesterOrder.hasOwnProperty(b.semester) ? semesterOrder[b.semester] : 999; // Resolves the numeric order for the second semester or defaults to a large value.
+  if (aOrd !== bOrd) return aOrd - bOrd; // If semesters differ, orders by their mapped numeric values.
+  if ((a.fileLabel || "") < (b.fileLabel || "")) return -1; // Uses the file label alphabetically as a tiebreaker when earlier.
+  if ((a.fileLabel || "") > (b.fileLabel || "")) return 1; // Uses the file label alphabetically as a tiebreaker when later.
+  return 0; // Treats the records as equal if year, semester, and labels match.
+} // Ends the comparison function used for ordering files.
 
+// Stores parsed file contents keyed by filename for reuse across interactions.
 const filesData = new Map();
+// References the file input element for capturing uploaded CSV files.
 const fileInput = document.getElementById('fileInput');
+// References the status display showing which files are loaded.
 const uploadedFiles = document.getElementById('uploadedFiles');
+// References the column selection dropdown used for filtering.
 const pickColumn = document.getElementById('pickColumn');
+// References the text input where the user enters the value to filter on.
 const columnValue = document.getElementById('columnValue');
+// References the button that initiates the find operation.
 const findFilesBtn = document.getElementById('findFiles');
+// References the container that will hold field checkboxes.
 const fieldsList = document.getElementById('fieldsList');
+// References the button that creates the comparison table.
 const createTableBtn = document.getElementById('createTable');
+// References the button that triggers graph generation.
 const createGraphBtn = document.getElementById('createGraph');
+// References the div where tables or charts are rendered.
 const resultsDiv = document.getElementById('results');
+// References the container showing the current order of matched files.
 const filesOrderDiv = document.getElementById('filesOrder');
+// References the button that clears all uploaded data.
 const clearAllBtn = document.getElementById('clearAll');
+// References the button that resets filtering to display all files.
 const showAllBtn = document.getElementById('showAllColumns');
 
+// Holds the filenames that matched the current filter criteria.
 let matchedFiles = [];
+// Stores the currently available fields aggregated from matched files.
 let currentFields = [];
+// Tracks which fields the user has selected for output.
 let selectedFields = new Set();
+// Stores the current ordering of matched files for table and graph generation.
 let filesOrder = [];
+// Keeps a reference to the Sortable instance controlling drag-and-drop ordering.
 let sortableFiles = null;
 
+// Reacts when the user selects files, parses them, and updates the interface state.
 fileInput.addEventListener('change', async (ev) => {
-  const files = Array.from(ev.target.files);
-  if (files.length === 0) return;
-  resultsDiv.innerHTML = '';
-  uploadedFiles.innerHTML = `Parsing ${files.length} file(s)...`;
-  await parseAndProcessFiles(files);
-  uploadedFiles.innerHTML = `<strong>${filesData.size}</strong> file(s) loaded.`;
+  const files = Array.from(ev.target.files); // Converts the FileList to a regular array for iteration.
+  if (files.length === 0) return; // Exits early if no files were selected.
+  resultsDiv.innerHTML = ''; // Clears any previously generated output.
+  uploadedFiles.innerHTML = `Parsing ${files.length} file(s)...`; // Shows feedback that parsing is in progress.
+  await parseAndProcessFiles(files); // Parses each selected file and loads them into memory.
+  uploadedFiles.innerHTML = `<strong>${filesData.size}</strong> file(s) loaded.`; // Displays the total count of successfully loaded files.
   // clear previous matches
-  matchedFiles = [];
-  filesOrderDiv.innerHTML = '';
-  fieldsList.innerHTML = '<div class="hint">No fields available.</div>';
-  populateColumnPicker();
-});
+  matchedFiles = []; // Resets the matched files list so new results must be computed.
+  filesOrderDiv.innerHTML = ''; // Removes any displayed file order from a prior run.
+  fieldsList.innerHTML = '<div class="hint">No fields available.</div>'; // Resets the fields list until matches are chosen.
+  populateColumnPicker(); // Repopulates the column dropdown based on the newly uploaded data.
+}); // Ends the change listener for handling new file uploads.
 
+// Clears all loaded data and restores the interface to its initial state when invoked.
 clearAllBtn.addEventListener('click', () => {
-  filesData.clear();
-  matchedFiles = [];
-  currentFields = [];
-  selectedFields.clear();
-  filesOrder = [];
-  pickColumn.innerHTML = '<option value="">(upload files to populate)</option>';
-  uploadedFiles.innerHTML = 'No files uploaded.';
-  fieldsList.innerHTML = '<div class="hint">No fields available.</div>';
-  filesOrderDiv.innerHTML = '';
-  resultsDiv.innerHTML = '';
-  fileInput.value = '';
-});
+  filesData.clear(); // Removes all parsed file data from memory.
+  matchedFiles = []; // Clears the list of matched files.
+  currentFields = []; // Clears the list of aggregated fields.
+  selectedFields.clear(); // Removes any field selections the user made.
+  filesOrder = []; // Resets the ordering of files.
+  pickColumn.innerHTML = '<option value="">(upload files to populate)</option>'; // Restores the column dropdown to its default placeholder.
+  uploadedFiles.innerHTML = 'No files uploaded.'; // Updates the status text to reflect the cleared state.
+  fieldsList.innerHTML = '<div class="hint">No fields available.</div>'; // Reverts the fields list to its empty hint message.
+  filesOrderDiv.innerHTML = ''; // Clears any displayed ordering chips.
+  resultsDiv.innerHTML = ''; // Removes any tables or graphs previously shown.
+  fileInput.value = ''; // Resets the file input so the same files can be reselected if desired.
+}); // Ends the handler for the Clear All button.
 
+// Displays every uploaded file without filtering when the user requests it.
 showAllBtn.addEventListener('click', () => {
-  if (filesData.size === 0) { alert('Upload files first.'); return; }
-  matchedFiles = Array.from(filesData.keys());
-  updateFieldsListFromMatchedFiles();
-  prepareFilesOrder(matchedFiles);
-  uploadedFiles.innerHTML = `${matchedFiles.length} file(s) matched (showing all uploaded files).`;
-});
+  if (filesData.size === 0) { alert('Upload files first.'); return; } // Alerts the user if no files are available to show.
+  matchedFiles = Array.from(filesData.keys()); // Selects all uploaded filenames as the matched set.
+  updateFieldsListFromMatchedFiles(); // Updates the available field checkboxes based on the complete file list.
+  prepareFilesOrder(matchedFiles); // Builds the draggable ordering chips using the entire file set.
+  uploadedFiles.innerHTML = `${matchedFiles.length} file(s) matched (showing all uploaded files).`; // Communicates how many files are currently considered matched.
+}); // Ends the handler that reveals all files.
 
+// Attempts to find files containing a specified value in a user-selected column.
 findFilesBtn.addEventListener('click', () => {
-  if (filesData.size === 0) { alert('Upload files first.'); return; }
-  const col = pickColumn.value;
-  const val = (columnValue.value || "").trim();
-  if (!col) { alert('Pick a column first'); return; }
-  if (!val) { alert('Enter a value to search for'); return; }
+  if (filesData.size === 0) { alert('Upload files first.'); return; } // Prevents searching before any files are loaded.
+  const col = pickColumn.value; // Retrieves the name of the column to inspect.
+  const val = (columnValue.value || "").trim(); // Reads and trims the search value entered by the user.
+  if (!col) { alert('Pick a column first'); return; } // Requires the user to choose a column before searching.
+  if (!val) { alert('Enter a value to search for'); return; } // Requires the user to provide a search value before proceeding.
 
-  const searchVal = val.toLowerCase();
-  const found = [];
-  for (const [fname, data] of filesData.entries()) {
-    const rows = data.rows;
-    let any = false;
-    for (const r of rows) {
-      const v = (r[col] !== undefined && r[col] !== null) ? String(r[col]).trim().toLowerCase() : "";
-      if (v === searchVal) { any = true; break; }
+  const searchVal = val.toLowerCase(); // Normalizes the search value for case-insensitive comparison.
+  const found = []; // Collects filenames that contain at least one matching row.
+  for (const [fname, data] of filesData.entries()) { // Iterates through every uploaded file and its parsed data.
+    const rows = data.rows; // Retrieves the cleaned rows for the current file.
+    let any = false; // Tracks whether a matching row has been found in this file.
+    for (const r of rows) { // Examines each row from the file.
+      const v = (r[col] !== undefined && r[col] !== null) ? String(r[col]).trim().toLowerCase() : ""; // Safely converts the column value to a trimmed lowercase string.
+      if (v === searchVal) { any = true; break; } // Marks the file as matched if any row equals the search value.
     }
-    if (any) found.push(fname);
+    if (any) found.push(fname); // Adds the file to the matched list when at least one row matches.
   }
   // update matchedFiles properly and UI
-  matchedFiles = found;
-  if (matchedFiles.length === 0) {
+  matchedFiles = found; // Stores the newly determined list of matching filenames.
+  if (matchedFiles.length === 0) { // Handles the case where no files matched the search.
     // no matches: clear fields and file order and inform user
-    fieldsList.innerHTML = '<div class="hint">No fields available for selected files.</div>';
-    filesOrderDiv.innerHTML = '';
-    resultsDiv.innerHTML = '';
-    uploadedFiles.innerHTML = `0 files matched for "${val}".`;
-    alert('No files contain that value in that column.');
-    return;
+    fieldsList.innerHTML = '<div class="hint">No fields available for selected files.</div>'; // Shows that there are no fields to pick.
+    filesOrderDiv.innerHTML = ''; // Clears any existing file ordering display.
+    resultsDiv.innerHTML = ''; // Removes previously generated output.
+    uploadedFiles.innerHTML = `0 files matched for "${val}".`; // Communicates that no files matched the criteria.
+    alert('No files contain that value in that column.'); // Alerts the user about the lack of matches.
+    return; // Stops further processing since there are no matches.
   }
   // otherwise update lists and order
-  updateFieldsListFromMatchedFiles();
-  prepareFilesOrder(matchedFiles);
-  uploadedFiles.innerHTML = `${matchedFiles.length} file(s) matched for "${val}".`;
-});
+  updateFieldsListFromMatchedFiles(); // Refreshes the field selection checkboxes using the matched files.
+  prepareFilesOrder(matchedFiles); // Rebuilds the draggable file order for the matched subset.
+  uploadedFiles.innerHTML = `${matchedFiles.length} file(s) matched for "${val}".`; // Updates the status text with the number of matching files.
+}); // Ends the handler for the Find files button.
 
+// Fills the column dropdown with the union of headers across all loaded files.
 function populateColumnPicker() {
-  const union = new Set();
-  for (const d of filesData.values()) {
-    for (const h of d.headers) union.add(h);
+  const union = new Set(); // Collects unique column names discovered from every file.
+  for (const d of filesData.values()) { // Iterates over each loaded file's data.
+    for (const h of d.headers) union.add(h); // Adds each header to the union set so duplicates are eliminated.
   }
-  const arr = Array.from(union).sort((a,b)=> a.localeCompare(b, undefined, {sensitivity:'base'}));
-  pickColumn.innerHTML = '<option value="">-- pick a column --</option>';
-  for (const h of arr) {
-    const opt = document.createElement('option');
-    opt.value = h;
-    opt.textContent = h;
-    pickColumn.appendChild(opt);
+  const arr = Array.from(union).sort((a,b)=> a.localeCompare(b, undefined, {sensitivity:'base'})); // Sorts headers alphabetically in a case-insensitive manner for user friendliness.
+  pickColumn.innerHTML = '<option value="">-- pick a column --</option>'; // Resets the dropdown and inserts a placeholder option.
+  for (const h of arr) { // Iterates through the sorted headers to populate the dropdown.
+    const opt = document.createElement('option'); // Creates an option element for the header.
+    opt.value = h; // Sets the option value to the exact header string.
+    opt.textContent = h; // Displays the header name to the user.
+    pickColumn.appendChild(opt); // Adds the option to the column selector dropdown.
   }
-}
+} // Ends the routine that populates the column picker control.
 
+// Generates the list of fields (checkboxes) based on the currently matched files.
 function updateFieldsListFromMatchedFiles() {
-  currentFields = [];
-  const union = new Set();
-  for (const fname of matchedFiles) {
-    const d = filesData.get(fname);
-    if (!d) continue;
-    for (const h of d.headers) union.add(h);
+  currentFields = []; // Resets the cached list of fields.
+  const union = new Set(); // Collects unique headers present across matched files.
+  for (const fname of matchedFiles) { // Iterates through each matched filename.
+    const d = filesData.get(fname); // Retrieves the parsed data for the current file.
+    if (!d) continue; // Skips files that might be missing due to data inconsistency.
+    for (const h of d.headers) union.add(h); // Adds each header from the file to the union set.
   }
-  currentFields = Array.from(union).sort((a,b)=> a.localeCompare(b, undefined, {sensitivity:'base'}));
-  if (currentFields.length === 0) {
-    fieldsList.innerHTML = '<div class="hint">No fields available for selected files.</div>';
-    return;
+  currentFields = Array.from(union).sort((a,b)=> a.localeCompare(b, undefined, {sensitivity:'base'})); // Produces a sorted array of unique headers for display.
+  if (currentFields.length === 0) { // Handles the scenario where no fields are available across matched files.
+    fieldsList.innerHTML = '<div class="hint">No fields available for selected files.</div>'; // Informs the user that no selectable fields exist.
+    return; // Exits early because there are no fields to render.
   }
-  fieldsList.innerHTML = '';
-  selectedFields.clear();
-  for (const h of currentFields) {
-    const lbl = document.createElement('label');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = true;
-    cb.value = h;
-    cb.addEventListener('change', (ev) => {
-      if (cb.checked) selectedFields.add(h); else selectedFields.delete(h);
-    });
-    lbl.appendChild(cb);
-    const span = document.createElement('span');
-    span.textContent = h;
-    lbl.appendChild(span);
-    fieldsList.appendChild(lbl);
-    selectedFields.add(h);
+  fieldsList.innerHTML = ''; // Clears any existing field checkboxes before repopulating.
+  selectedFields.clear(); // Resets the set of selected fields so defaults can be reapplied.
+  for (const h of currentFields) { // Iterates over each available field to create a checkbox entry.
+    const lbl = document.createElement('label'); // Creates a label to wrap the checkbox and text.
+    const cb = document.createElement('input'); // Creates a checkbox input element for the field.
+    cb.type = 'checkbox'; // Specifies that the input is a checkbox control.
+    cb.checked = true; // Defaults the checkbox to selected so fields are included by default.
+    cb.value = h; // Stores the field name on the checkbox value for easy retrieval.
+    cb.addEventListener('change', (ev) => { // Adds a listener to track when the user toggles this field.
+      if (cb.checked) selectedFields.add(h); else selectedFields.delete(h); // Adds or removes the field from the selection set based on the checkbox state.
+    }); // Ends the change listener that maintains selected fields.
+    lbl.appendChild(cb); // Inserts the checkbox into the label container.
+    const span = document.createElement('span'); // Creates a span to hold the field name text.
+    span.textContent = h; // Sets the span text to the field name so the user can read it.
+    lbl.appendChild(span); // Adds the descriptive text next to the checkbox.
+    fieldsList.appendChild(lbl); // Adds the fully assembled label to the list of checkboxes.
+    selectedFields.add(h); // Records the field as selected since it starts checked.
   }
-}
+} // Ends the function that constructs the field checkbox list.
 
+// Prepares the draggable ordering UI for the specified list of file keys.
 function prepareFilesOrder(fileKeys) {
-  const parsed = fileKeys.map(k => ({key:k, parsed: filesData.get(k).parsedName || parseFileNameKey(k)}));
-  parsed.sort((x,y) => semesterSortKey(x.parsed, y.parsed));
-  filesOrder = parsed.map(x => x.key);
-  filesOrderDiv.innerHTML = '';
-  for (const k of filesOrder) {
-    const el = document.createElement('div');
-    el.className = 'file-column';
-    el.textContent = k;
-    el.dataset.key = k;
-    filesOrderDiv.appendChild(el);
+  const parsed = fileKeys.map(k => ({key:k, parsed: filesData.get(k).parsedName || parseFileNameKey(k)})); // Associates each filename with its parsed metadata, parsing on demand.
+  parsed.sort((x,y) => semesterSortKey(x.parsed, y.parsed)); // Sorts the array using the semester-aware comparison logic.
+  filesOrder = parsed.map(x => x.key); // Extracts the sorted filenames into the order array used elsewhere.
+  filesOrderDiv.innerHTML = ''; // Clears any existing chips before repopulating the display.
+  for (const k of filesOrder) { // Iterates over each ordered filename to render its chip.
+    const el = document.createElement('div'); // Creates a div that will act as the draggable chip.
+    el.className = 'file-column'; // Applies styling to make the chip visually distinct.
+    el.textContent = k; // Displays the filename on the chip for user reference.
+    el.dataset.key = k; // Stores the filename as a data attribute to retrieve after drag operations.
+    filesOrderDiv.appendChild(el); // Adds the chip to the file order container.
   }
-  if (sortableFiles) sortableFiles.destroy();
+  if (sortableFiles) sortableFiles.destroy(); // Removes an existing Sortable instance to prevent duplicate bindings.
   sortableFiles = new Sortable(filesOrderDiv, {
-    animation: 150,
+    animation: 150, // Enables smooth animations during drag-and-drop interactions.
     onEnd: (evt) => {
-      const children = Array.from(filesOrderDiv.children);
-      filesOrder = children.map(ch => ch.dataset.key);
-    }
-  });
-}
+      const children = Array.from(filesOrderDiv.children); // Collects the current chip order after dragging.
+      filesOrder = children.map(ch => ch.dataset.key); // Updates the filesOrder array to match the visual arrangement.
+    } // Ends the onEnd handler that persists the new order.
+  }); // Configures the Sortable instance for the file order container.
+} // Ends the function responsible for building the reorderable file list.
 
+// Parses each uploaded file, cleans the data, and stores it for future use.
 async function parseAndProcessFiles(fileList) {
-  filesData.clear();
-  for (const f of fileList) {
+  filesData.clear(); // Clears any previously stored file data before processing the new set.
+  for (const f of fileList) { // Iterates through each uploaded file.
     await new Promise((res, rej) => {
       Papa.parse(f, {
-        skipEmptyLines: false,
+        skipEmptyLines: false, // Keeps empty lines so header detection can evaluate row density accurately.
         complete: function(results) {
           try {
-            const arr = results.data.map(row => row.map(cell => cell === undefined ? '' : cell));
-            let maxNonEmpty = -1;
-            for (let i=0;i<arr.length;i++) {
-              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0);
-              if (nonEmpty > maxNonEmpty) maxNonEmpty = nonEmpty;
+            const arr = results.data.map(row => row.map(cell => cell === undefined ? '' : cell)); // Normalizes parsed CSV rows, replacing undefined cells with empty strings.
+            let maxNonEmpty = -1; // Tracks the highest number of non-empty cells found in any row.
+            for (let i=0;i<arr.length;i++) { // Iterates through rows to count filled cells.
+              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0); // Counts how many cells in the row contain actual data.
+              if (nonEmpty > maxNonEmpty) maxNonEmpty = nonEmpty; // Updates the maximum when a denser row is found.
             }
-            let headerRowIndex = null;
-            for (let i=0;i<arr.length;i++) {
-              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0);
-              if (nonEmpty === maxNonEmpty) { headerRowIndex = i; break; }
+            let headerRowIndex = null; // Will store the index of the row chosen as the header.
+            for (let i=0;i<arr.length;i++) { // Searches again to locate the row with the highest density.
+              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0); // Recomputes the non-empty count for the row.
+              if (nonEmpty === maxNonEmpty) { headerRowIndex = i; break; } // Picks the first row with the maximum non-empty cells as the header.
             }
-            if (headerRowIndex === null) headerRowIndex = 0;
-            const rawHeader = arr[headerRowIndex].map(h => String(h || '').trim());
-            const dataRows = arr.slice(headerRowIndex+1);
+            if (headerRowIndex === null) headerRowIndex = 0; // Falls back to the first row if no suitable header was identified.
+            const rawHeader = arr[headerRowIndex].map(h => String(h || '').trim()); // Extracts and trims header names from the chosen row.
+            const dataRows = arr.slice(headerRowIndex+1); // Gathers all rows following the header for data processing.
             const mappedRows = dataRows.map(r => {
-              const obj = {};
-              for (let i=0;i<rawHeader.length;i++) obj[rawHeader[i]] = (i < r.length) ? r[i] : '';
-              return obj;
-            });
-            const statusColName = rawHeader.find(h => h.toLowerCase() === 'response status');
-            let filteredRows = mappedRows;
+              const obj = {}; // Prepares an object to represent the row keyed by header names.
+              for (let i=0;i<rawHeader.length;i++) obj[rawHeader[i]] = (i < r.length) ? r[i] : ''; // Assigns each header value from the row, defaulting to empty strings when missing.
+              return obj; // Returns the constructed row object for inclusion in the dataset.
+            }); // Ends the mapping that converts arrays into header-keyed objects.
+            const statusColName = rawHeader.find(h => h.toLowerCase() === 'response status'); // Looks for a column explicitly named "Response Status" in a case-insensitive way.
+            let filteredRows = mappedRows; // Starts with all mapped rows prior to filtering.
             if (statusColName) {
               filteredRows = mappedRows.filter(r => {
-                const v = (r[statusColName] || '').toString().trim();
-                return v.toLowerCase() === 'completed';
-              });
+                const v = (r[statusColName] || '').toString().trim(); // Retrieves and trims the response status value for the row.
+                return v.toLowerCase() === 'completed'; // Keeps only rows where the response status indicates completion.
+              }); // Ends the filter that removes incomplete responses when the column exists.
             }
-            const finalHeaders = [];
+            const finalHeaders = []; // Will contain headers that have non-empty data in filtered rows.
             for (const h of rawHeader) {
               const anyData = filteredRows.some(r => {
-                const v = r[h];
-                return v !== undefined && v !== null && String(v).trim() !== '';
-              });
-              if (anyData) finalHeaders.push(h);
+                const v = r[h]; // Reads the value for the current header in this row.
+                return v !== undefined && v !== null && String(v).trim() !== ''; // Checks whether any non-empty data exists for the header.
+              }); // Ends the search for non-empty values under this header.
+              if (anyData) finalHeaders.push(h); // Keeps headers that actually contain meaningful data.
             }
-            const hasFirst = finalHeaders.find(h => h.toLowerCase() === 'first name');
-            const hasLast = finalHeaders.find(h => h.toLowerCase() === 'last name');
+            const hasFirst = finalHeaders.find(h => h.toLowerCase() === 'first name'); // Detects if a "First Name" column remains after filtering.
+            const hasLast = finalHeaders.find(h => h.toLowerCase() === 'last name'); // Detects if a "Last Name" column remains after filtering.
             if (hasFirst || hasLast) {
-              if (!finalHeaders.includes('Full Name')) finalHeaders.push('Full Name');
+              if (!finalHeaders.includes('Full Name')) finalHeaders.push('Full Name'); // Ensures a synthesized Full Name column is available when first or last names exist.
               filteredRows = filteredRows.map(r => {
-                const f = hasFirst ? (r[hasFirst] || '') : '';
-                const l = hasLast ? (r[hasLast] || '') : '';
-                r['Full Name'] = (String(f).trim() + ' ' + String(l).trim()).trim().toLowerCase();
-                return r;
-              });
+                const f = hasFirst ? (r[hasFirst] || '') : ''; // Retrieves the first-name value when present.
+                const l = hasLast ? (r[hasLast] || '') : ''; // Retrieves the last-name value when present.
+                r['Full Name'] = (String(f).trim() + ' ' + String(l).trim()).trim().toLowerCase(); // Builds a normalized full-name string for consistent comparison.
+                return r; // Returns the augmented row object including the Full Name field.
+              }); // Ends the mapping that adds a Full Name column for matching purposes.
             }
             const cleanedRows = filteredRows.map(r => {
-              const obj = {};
-              for (const h of finalHeaders) obj[h] = r[h] !== undefined ? r[h] : '';
-              return obj;
-            });
-            const parsedName = parseFileNameKey(f.name);
-            filesData.set(f.name, { filename: f.name, headers: finalHeaders, rows: cleanedRows, originalHeader: rawHeader, parsedName });
-            res();
-          } catch(err) { console.error(err); rej(err); }
-        },
-        error: function(err) { rej(err); }
-      });
-    });
+              const obj = {}; // Prepares a new object limited to headers that still contain data.
+              for (const h of finalHeaders) obj[h] = r[h] !== undefined ? r[h] : ''; // Copies values for each retained header, defaulting missing entries to empty strings.
+              return obj; // Returns the cleaned row object.
+            }); // Ends the transformation that strips unused columns.
+            const parsedName = parseFileNameKey(f.name); // Parses the filename to collect metadata for ordering and display.
+            filesData.set(f.name, { filename: f.name, headers: finalHeaders, rows: cleanedRows, originalHeader: rawHeader, parsedName }); // Stores all relevant processed data keyed by the original filename.
+            res(); // Resolves the promise to indicate the file finished processing successfully.
+          } catch(err) { console.error(err); rej(err); } // Logs unexpected errors and rejects the promise to surface issues.
+        }, // Ends the completion callback from PapaParse once a file is parsed.
+        error: function(err) { rej(err); } // Propagates parsing errors by rejecting the promise.
+      }); // Configures PapaParse with handlers and options for processing the file.
+    }); // Wraps PapaParse in a promise so the caller can await sequential processing.
   }
-}
+} // Ends the asynchronous routine that imports and cleans uploaded CSV files.
 
+// Builds and renders a comparison table using the provided file order and selected fields.
 function renderTable(order, fields) {
-  resultsDiv.innerHTML = '';
-  const table = document.createElement('table');
-  const thead = document.createElement('thead');
-  const thr = document.createElement('tr');
-  const corner = document.createElement('th');
-  corner.textContent = 'Field \\ File';
-  thr.appendChild(corner);
+  resultsDiv.innerHTML = ''; // Clears any previous output before drawing the new table.
+  const table = document.createElement('table'); // Creates the table element that will contain the comparison grid.
+  const thead = document.createElement('thead'); // Creates the table header section.
+  const thr = document.createElement('tr'); // Creates the header row that will contain column titles.
+  const corner = document.createElement('th'); // Creates the corner cell labeling the row headers.
+  corner.textContent = 'Field \\ File'; // Labels the corner cell to describe the table layout.
+  thr.appendChild(corner); // Adds the corner header cell to the header row.
   for (const k of order) {
-    const th = document.createElement('th');
-    th.textContent = k;
-    thr.appendChild(th);
+    const th = document.createElement('th'); // Creates a header cell for the current file.
+    th.textContent = k; // Displays the filename as the column label.
+    thr.appendChild(th); // Adds the header cell to the header row.
   }
-  thead.appendChild(thr);
-  table.appendChild(thead);
-  const tbody = document.createElement('tbody');
+  thead.appendChild(thr); // Inserts the assembled header row into the table header section.
+  table.appendChild(thead); // Attaches the header section to the table.
+  const tbody = document.createElement('tbody'); // Creates the body section where field data will appear.
 
-  const filterCol = pickColumn.value;
-  const filterVal = (columnValue.value||"").trim().toLowerCase();
+  const filterCol = pickColumn.value; // Retrieves the column currently chosen for filtering.
+  const filterVal = (columnValue.value||"").trim().toLowerCase(); // Retrieves and normalizes the filter value for case-insensitive comparisons.
 
   for (const field of fields) {
-    const tr = document.createElement('tr');
-    const rlabel = document.createElement('td');
-    rlabel.textContent = field;
-    tr.appendChild(rlabel);
+    const tr = document.createElement('tr'); // Creates a row representing the current field across files.
+    const rlabel = document.createElement('td'); // Creates the cell that labels the field name.
+    rlabel.textContent = field; // Displays the field name in the row header cell.
+    tr.appendChild(rlabel); // Adds the field label cell to the row.
     for (const k of order) {
-      const td = document.createElement('td');
-      const d = filesData.get(k);
-      if (!d) { td.textContent=''; tr.appendChild(td); continue; }
-      if (!d.headers.includes(field)) { td.textContent=''; tr.appendChild(td); continue; }
-      let rowsToUse = d.rows;
+      const td = document.createElement('td'); // Creates a data cell for the current file and field.
+      const d = filesData.get(k); // Retrieves the parsed data for the current file.
+      if (!d) { td.textContent=''; tr.appendChild(td); continue; } // Handles missing file data gracefully by leaving the cell empty.
+      if (!d.headers.includes(field)) { td.textContent=''; tr.appendChild(td); continue; } // Leaves the cell empty if the field does not exist in the file.
+      let rowsToUse = d.rows; // Starts with all rows from the file before applying filters.
       if (filterCol && filterVal) {
         rowsToUse = d.rows.filter(r => {
-          const v = (r[filterCol] || "").toString().trim().toLowerCase();
-          return v === filterVal;
-        });
+          const v = (r[filterCol] || "").toString().trim().toLowerCase(); // Normalizes the filter column value for the row.
+          return v === filterVal; // Keeps only rows where the filter column matches the target value.
+        }); // Ends the filter that narrows rows to those matching the active filter.
       }
-      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!=='');
-      const unique = Array.from(new Set(values));
-      td.textContent = unique.join(' | ');
-      tr.appendChild(td);
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed field values from the filtered rows, removing empties.
+      const unique = Array.from(new Set(values)); // Removes duplicates so repeated answers appear only once.
+      td.textContent = unique.join(' | '); // Displays the unique values separated by pipes for readability.
+      tr.appendChild(td); // Adds the populated cell to the current row.
     }
-    tbody.appendChild(tr);
+    tbody.appendChild(tr); // Inserts the completed field row into the table body.
   }
-  table.appendChild(tbody);
-  const exportBtn = document.createElement('button');
-  exportBtn.textContent = 'Export table as CSV';
+  table.appendChild(tbody); // Attaches the body containing all field rows to the table.
+  const exportBtn = document.createElement('button'); // Creates a button allowing the user to download the table data.
+  exportBtn.textContent = 'Export table as CSV'; // Labels the export button to clarify its action.
   exportBtn.addEventListener('click', ()=> {
-    const csv = tableToCSV(order, fields);
-    downloadText(csv, 'table_export_v3.csv');
-  });
-  const container = document.createElement('div');
-  container.appendChild(table);
-  container.appendChild(exportBtn);
-  resultsDiv.appendChild(container);
-}
+    const csv = tableToCSV(order, fields); // Converts the rendered table data back into CSV format.
+    downloadText(csv, 'table_export_v3.csv'); // Initiates a download of the generated CSV file.
+  }); // Ends the click handler that exports the table data.
+  const container = document.createElement('div'); // Creates a wrapper div to hold the table and export button together.
+  container.appendChild(table); // Inserts the table into the container.
+  container.appendChild(exportBtn); // Adds the export button below the table.
+  resultsDiv.appendChild(container); // Displays the assembled table and export control in the results area.
+} // Ends the function that renders the comparison table.
 
+// Converts the currently selected table data into a CSV string for export.
 function tableToCSV(order, fields) {
-  const lines=[];
-  const header=['Field/File', ...order];
-  lines.push(header.map(csvEscape).join(','));
-  const filterCol = pickColumn.value;
-  const filterVal = (columnValue.value||"").trim().toLowerCase();
+  const lines=[]; // Will gather each CSV row as a string.
+  const header=['Field/File', ...order]; // Defines the CSV header row combining the field label column with file columns.
+  lines.push(header.map(csvEscape).join(',')); // Adds the escaped header row to the CSV output.
+  const filterCol = pickColumn.value; // Retrieves the active filter column name.
+  const filterVal = (columnValue.value||"").trim().toLowerCase(); // Retrieves the normalized filter value for consistent matching.
   for (const field of fields) {
-    const row=[field];
+    const row=[field]; // Starts a CSV row with the field name as the first column.
     for (const k of order) {
-      const d = filesData.get(k);
-      if (!d || !d.headers.includes(field)) { row.push(''); continue; }
-      let rowsToUse = d.rows;
+      const d = filesData.get(k); // Retrieves data for the current file column.
+      if (!d || !d.headers.includes(field)) { row.push(''); continue; } // Inserts an empty value if the file lacks the field.
+      let rowsToUse = d.rows; // Uses all rows by default before applying filters.
       if (filterCol && filterVal) {
         rowsToUse = d.rows.filter(r => {
-          const v = (r[filterCol] || "").toString().trim().toLowerCase();
-          return v === filterVal;
-        });
+          const v = (r[filterCol] || "").toString().trim().toLowerCase(); // Normalizes the comparison value from the filter column.
+          return v === filterVal; // Keeps only rows where the filter column matches the desired value.
+        }); // Ends the filtering of rows for CSV export.
       }
-      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!=='');
-      const unique = Array.from(new Set(values));
-      row.push(unique.join(' | '));
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed field values from the filtered rows, excluding blanks.
+      const unique = Array.from(new Set(values)); // Removes duplicate entries so the CSV mirrors the on-screen table.
+      row.push(unique.join(' | ')); // Appends the combined unique values to the CSV row.
     }
-    lines.push(row.map(csvEscape).join(','));
+    lines.push(row.map(csvEscape).join(',')); // Adds the assembled row to the CSV output after escaping.
   }
-  return lines.join('\n');
-}
+  return lines.join('\n'); // Joins all rows with newline separators to produce the final CSV string.
+} // Ends the helper that serializes table data into CSV.
 function csvEscape(s) {
-  if (s==null) return '';
-  s=String(s);
-  if (s.includes(',')||s.includes('"')||s.includes('\n')) return '"' + s.replace(/"/g,'""') + '"';
-  return s;
-}
+  if (s==null) return ''; // Treats null or undefined values as empty strings in CSV output.
+  s=String(s); // Ensures the value is a string before inspection.
+  if (s.includes(',')||s.includes('"')||s.includes('\n')) return '"' + s.replace(/"/g,'""') + '"'; // Surrounds strings containing special characters with quotes and escapes internal quotes.
+  return s; // Returns the value unchanged when no escaping is needed.
+} // Ends the CSV escaping utility.
 function downloadText(text, filename) {
-  const blob = new Blob([text], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
+  const blob = new Blob([text], {type:'text/csv'}); // Creates a Blob object containing the CSV text with the appropriate MIME type.
+  const url = URL.createObjectURL(blob); // Generates a temporary URL pointing to the blob data for download.
+  const a=document.createElement('a'); // Creates a temporary anchor element to trigger the download.
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); // Configures, triggers, and cleans up the download link to save the file.
+  setTimeout(()=>URL.revokeObjectURL(url),1000); // Revokes the object URL after a short delay to free browser resources.
+} // Ends the helper that downloads generated text content as a file.
 
+// Creates graphs summarizing field values across files based on the selected ordering and fields.
 function renderGraphs(order, fields) {
-  resultsDiv.innerHTML='';
-  const graphsWrap=document.createElement('div'); graphsWrap.className='graphs';
+  resultsDiv.innerHTML=''; // Clears previous results before drawing graphs.
+  const graphsWrap=document.createElement('div'); graphsWrap.className='graphs'; // Creates a container for all graph cards and applies styling.
   for (const field of fields) {
-    const card=document.createElement('div'); card.className='graph-card';
-    const title=document.createElement('div'); title.innerHTML=`<strong>${field}</strong>`; card.appendChild(title);
-    const canvas=document.createElement('canvas'); canvas.style.maxWidth='100%'; card.appendChild(canvas);
-    graphsWrap.appendChild(card);
-    const labels=[]; const dataVals=[]; const meta=[];
+    const card=document.createElement('div'); card.className='graph-card'; // Builds a card element to house each individual chart.
+    const title=document.createElement('div'); title.innerHTML=`<strong>${field}</strong>`; card.appendChild(title); // Adds a bold title showing the field being visualized.
+    const canvas=document.createElement('canvas'); canvas.style.maxWidth='100%'; card.appendChild(canvas); // Creates a canvas for Chart.js to render into and constrains its width.
+    graphsWrap.appendChild(card); // Adds the completed card to the graphs container.
+    const labels=[]; const dataVals=[]; const meta=[]; // Prepares arrays for chart labels, data points, and metadata about aggregation.
     for (const k of order) {
-      labels.push(k);
-      const d = filesData.get(k);
-      if (!d || !d.headers.includes(field)) { dataVals.push(null); meta.push({type:'missing'}); continue;}
-      const values = d.rows.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!=='');
-      if (values.length===0) { dataVals.push(null); meta.push({type:'empty'}); continue; }
-      const numeric = values.map(v=>Number(v)).filter(v=>!Number.isNaN(v));
+      labels.push(k); // Adds the filename to the chart labels array.
+      const d = filesData.get(k); // Retrieves parsed data for the current file.
+      if (!d || !d.headers.includes(field)) { dataVals.push(null); meta.push({type:'missing'}); continue;} // Records a null data point when the field is absent and notes the missing status.
+      const values = d.rows.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed values for the field from all rows.
+      if (values.length===0) { dataVals.push(null); meta.push({type:'empty'}); continue; } // Marks the data as empty when no non-blank values exist.
+      const numeric = values.map(v=>Number(v)).filter(v=>!Number.isNaN(v)); // Attempts to convert all values to numbers, keeping only valid conversions.
       if (numeric.length===values.length) {
-        const avg = numeric.reduce((a,b)=>a+b,0)/numeric.length;
-        dataVals.push(Number.parseFloat(avg.toFixed(4))); meta.push({type:'numeric',agg:'avg'});
-      } else { dataVals.push(values.length); meta.push({type:'non-numeric',agg:'count'}); }
+        const avg = numeric.reduce((a,b)=>a+b,0)/numeric.length; // Computes the average of numeric values when all entries are numeric.
+        dataVals.push(Number.parseFloat(avg.toFixed(4))); meta.push({type:'numeric',agg:'avg'}); // Stores the average value with limited precision and notes the aggregation method.
+      } else { dataVals.push(values.length); meta.push({type:'non-numeric',agg:'count'}); } // Counts non-numeric responses and records that count aggregation was used.
     }
     new Chart(canvas, { type:'bar', data:{labels, datasets:[{label:field, data:dataVals}]}, options:{
-      responsive:true, scales:{x:{title:{display:true,text:'Files'}}, y:{title:{display:true,text:'Value'}, beginAtZero:true}},
-      plugins:{ tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `avg = ${context.formattedValue}`; if(m.type==='non-numeric') return `count = ${context.formattedValue}`; if(m.type==='empty') return `no data`; if(m.type==='missing') return `field not present`; return context.formattedValue; }}}}
-    }});
-    const note=document.createElement('div'); note.className='hint'; note.innerHTML='Note: Graphs aggregate across file rows (not filtered).';
-    card.appendChild(note);
+      responsive:true, scales:{x:{title:{display:true,text:'Files'}}, y:{title:{display:true,text:'Value'}, beginAtZero:true}}, // Configures axes titles, responsiveness, and baseline behavior for the chart.
+      plugins:{ tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `avg = ${context.formattedValue}`; if(m.type==='non-numeric') return `count = ${context.formattedValue}`; if(m.type==='empty') return `no data`; if(m.type==='missing') return `field not present`; return context.formattedValue; }}}} // Customizes tooltip text to explain how each bar's value was derived.
+    }}); // Instantiates a new Chart.js bar chart with the prepared data and configuration.
+    const note=document.createElement('div'); note.className='hint'; note.innerHTML='Note: Graphs aggregate across file rows (not filtered).'; // Adds a clarifying note about the aggregation behavior below the chart.
+    card.appendChild(note); // Appends the explanatory note to the graph card.
   }
-  resultsDiv.appendChild(graphsWrap);
-}
+  resultsDiv.appendChild(graphsWrap); // Displays the collection of graphs in the results area.
+} // Ends the function that renders graphs for selected fields.
 
 // Attach create buttons after functions declared
 createTableBtn.addEventListener('click', ()=> {
-  if (matchedFiles.length === 0) { alert('No matched files (use Find files or Show all files).'); return; }
-  const selected = Array.from(selectedFields);
-  if (selected.length === 0) { alert('Select at least one field.'); return; }
-  renderTable(filesOrder.slice(), selected);
-});
+  if (matchedFiles.length === 0) { alert('No matched files (use Find files or Show all files).'); return; } // Prevents table generation when no files are available.
+  const selected = Array.from(selectedFields); // Converts the selected fields set into an array for iteration order.
+  if (selected.length === 0) { alert('Select at least one field.'); return; } // Ensures at least one field is chosen before building a table.
+  renderTable(filesOrder.slice(), selected); // Generates the table using the current file order and selected fields.
+}); // Ends the click handler that builds tables.
 createGraphBtn.addEventListener('click', ()=> {
-  if (matchedFiles.length === 0) { alert('No matched files (use Find files or Show all files).'); return; }
-  const selected = Array.from(selectedFields);
-  if (selected.length === 0) { alert('Select at least one field.'); return; }
-  renderGraphs(filesOrder.slice(), selected);
-});
-</script>
-</body>
-</html>
+  if (matchedFiles.length === 0) { alert('No matched files (use Find files or Show all files).'); return; } // Prevents graph generation when no files are ready.
+  const selected = Array.from(selectedFields); // Converts the selected fields set into an array for the graph routine.
+  if (selected.length === 0) { alert('Select at least one field.'); return; } // Requires at least one field selection to build graphs.
+  renderGraphs(filesOrder.slice(), selected); // Produces graphs based on the selected fields and current file order.
+}); // Ends the click handler that builds graphs.
+</script> <!-- Closes the script block containing all application logic. -->
+</body> <!-- Ends the visible body content of the page. -->
+</html> <!-- Closes the root HTML element, completing the document structure. -->
