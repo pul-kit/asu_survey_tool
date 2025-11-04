@@ -7,7 +7,7 @@
   <!-- Sets the character encoding to UTF-8 so the page correctly displays a wide range of characters. -->
   <meta charset="utf-8" />
   <!-- Defines the title shown on the browser tab for user identification of the page. -->
-  <title>Survey CSV Processor & Visualizer (v3)</title>
+  <title>Survey CSV Processor & Visualizer</title>
   <!-- Ensures the viewport scales content appropriately on mobile devices by matching screen width and disabling default zoom. -->
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <!-- Loads PapaParse from a CDN to provide CSV parsing capabilities in the browser. -->
@@ -48,13 +48,13 @@
 <!-- Begins the visible portion of the document presented to the user. -->
 <body>
   <!-- Displays the main page heading identifying the application. -->
-  <h1>Survey CSV Processor & Visualizer (v3)</h1>
+  <h1>Survey CSV Processor & Visualizer</h1>
   <!-- Creates a horizontal container for the introductory instructions and file controls. -->
   <div class="topbar">
     <!-- Wraps the instructional text explaining how the tool behaves. -->
     <div>
       <!-- Highlights the directive to upload multiple CSV files. -->
-      <strong>Upload many CSV files</strong>
+      <strong>Upload CSV files</strong>
       <!-- Provides a note explaining how filters affect displayed table cells. -->
       <div class="hint">Table cells respect the active filter (column + value). Matched files will show only files containing that value.</div>
     </div>
@@ -96,6 +96,13 @@
 
       <!-- Labels the step for choosing which data fields to include in outputs. -->
       <label>Step 3 — Pick which fields (rows) to include</label>
+      <!-- Provides quick actions to toggle every displayed field checkbox at once. -->
+      <div class="controls">
+        <!-- Button that selects all currently shown field checkboxes. -->
+        <button id="selectAllFields" class="secondary">Select All</button>
+        <!-- Button that clears all current field selections by unchecking their boxes. -->
+        <button id="deselectAllFields" class="secondary">Deselect All</button>
+      </div>
       <!-- Container that will be filled with checkboxes representing available fields from matched files. -->
       <div class="checks" id="fieldsList"><div class="hint">No fields available.</div></div>
 
@@ -173,6 +180,10 @@ const columnValue = document.getElementById('columnValue');
 const findFilesBtn = document.getElementById('findFiles');
 // References the container that will hold field checkboxes.
 const fieldsList = document.getElementById('fieldsList');
+// References the button that selects every field checkbox currently displayed.
+const selectAllFieldsBtn = document.getElementById('selectAllFields');
+// References the button that clears every field checkbox currently displayed.
+const deselectAllFieldsBtn = document.getElementById('deselectAllFields');
 // References the button that creates the comparison table.
 const createTableBtn = document.getElementById('createTable');
 // References the button that triggers graph generation.
@@ -235,6 +246,27 @@ showAllBtn.addEventListener('click', () => {
   prepareFilesOrder(matchedFiles); // Builds the draggable ordering chips using the entire file set.
   uploadedFiles.innerHTML = `${matchedFiles.length} file(s) matched (showing all uploaded files).`; // Communicates how many files are currently considered matched.
 }); // Ends the handler that reveals all files.
+
+// Checks every field checkbox currently displayed when the user clicks the Select All button.
+selectAllFieldsBtn.addEventListener('click', () => {
+  const checkboxes = fieldsList.querySelectorAll('input[type="checkbox"]'); // Gathers the checkbox inputs presently rendered in the fields list.
+  if (checkboxes.length === 0) { alert('No fields available to select.'); return; } // Informs the user when there are no checkboxes to toggle.
+  selectedFields.clear(); // Clears the tracked selections so the set reflects the upcoming checked state.
+  checkboxes.forEach(cb => { // Iterates over every checkbox that represents a field.
+    cb.checked = true; // Marks the checkbox as checked so the UI shows the selection.
+    selectedFields.add(cb.value); // Records the field in the selection set so downstream features know it is included.
+  });
+}); // Ends the handler that selects all field checkboxes.
+
+// Clears every field checkbox currently displayed when the user clicks the Deselect All button.
+deselectAllFieldsBtn.addEventListener('click', () => {
+  const checkboxes = fieldsList.querySelectorAll('input[type="checkbox"]'); // Gathers the checkbox inputs presently rendered in the fields list.
+  if (checkboxes.length === 0) { alert('No fields available to deselect.'); return; } // Informs the user when there are no checkboxes to clear.
+  selectedFields.clear(); // Removes every field from the selection set so no fields remain chosen.
+  checkboxes.forEach(cb => { // Iterates over each checkbox that represents a field.
+    cb.checked = false; // Unchecks the checkbox to reflect that the field is no longer selected.
+  });
+}); // Ends the handler that deselects all field checkboxes.
 
 // Attempts to find files containing a specified value in a user-selected column.
 findFilesBtn.addEventListener('click', () => {
@@ -299,6 +331,7 @@ function updateFieldsListFromMatchedFiles() {
   }
   currentFields = Array.from(union).sort((a,b)=> a.localeCompare(b, undefined, {sensitivity:'base'})); // Produces a sorted array of unique headers for display.
   if (currentFields.length === 0) { // Handles the scenario where no fields are available across matched files.
+    selectedFields.clear(); // Empties the selected fields set so stale selections are removed when nothing is displayed.
     fieldsList.innerHTML = '<div class="hint">No fields available for selected files.</div>'; // Informs the user that no selectable fields exist.
     return; // Exits early because there are no fields to render.
   }
