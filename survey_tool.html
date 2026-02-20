@@ -1,0 +1,1444 @@
+<!-- Declares the document as HTML5 for modern parsing and standards compliance. -->
+<!doctype html>
+<!-- Opens the root HTML element and states that the content language is English for accessibility and search engines. -->
+<html lang="en">
+<!-- Begins the head section where metadata, linked resources, and styles are defined. -->
+<head>
+  <!-- Sets the character encoding to UTF-8 so the page correctly displays a wide range of characters. -->
+  <meta charset="utf-8" />
+  <!-- Defines the title shown on the browser tab for user identification of the page. -->
+  <title>Survey CSV Processor &amp; Visualizer</title>
+  <!-- Ensures the viewport scales content appropriately on mobile devices by matching screen width and disabling default zoom. -->
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Loads PapaParse from a CDN to provide CSV parsing capabilities in the browser. -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- Loads Chart.js from a CDN to enable data visualization rendering inside canvas elements. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Loads JSZip from a CDN so all processed CSV files can be downloaded as a single ZIP archive. -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <!-- Introduces an inline style block that defines all layout and appearance rules for the interface. -->
+  <style>
+    :root {
+      --page-bg: #f2f5fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fafd;
+      --surface-muted: #eef3fb;
+      --text: #152238;
+      --text-muted: #51607b;
+      --border: #ced7e6;
+      --border-strong: #9cadc8;
+      --accent: #1f5fbf;
+      --accent-strong: #194c99;
+      --focus-ring: #8db2eb;
+      --danger: #d23452;
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --shadow-soft: 0 10px 28px rgba(21, 34, 56, 0.08);
+      --shadow-panel: 0 6px 18px rgba(21, 34, 56, 0.06);
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --font-body: "Avenir Next", "Source Sans 3", "Segoe UI Variable", "Helvetica Neue", sans-serif;
+      --font-heading: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 1024px;
+      color: var(--text);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(141, 178, 235, 0.26), transparent 34%),
+        radial-gradient(circle at 90% 100%, rgba(149, 196, 220, 0.2), transparent 30%),
+        var(--page-bg);
+    }
+
+    .app-shell {
+      max-width: 1560px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .page-header {
+      margin-bottom: var(--space-4);
+    }
+
+    h1 {
+      margin: 0;
+      color: #0f1f37;
+      font-family: var(--font-heading);
+      font-size: 33px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+    }
+
+    .page-subtitle {
+      margin: var(--space-2) 0 0;
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-6);
+      margin-bottom: var(--space-5);
+      padding: var(--space-5);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(130deg, #ffffff 0%, #f5f9ff 100%);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .upload-copy {
+      min-width: 0;
+    }
+
+    .upload-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      margin: 0;
+      color: #102440;
+      font-family: var(--font-heading);
+      font-size: 24px;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+    }
+
+    .panel-title {
+      margin: 0;
+      color: #11294a;
+      font-family: var(--font-heading);
+      font-size: 21px;
+      font-weight: 650;
+      line-height: 1.25;
+    }
+
+    .panel-subtitle {
+      margin: 6px 0 0;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .hint {
+      margin-top: var(--space-2);
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .row {
+      display: flex;
+      gap: var(--space-5);
+      align-items: flex-start;
+    }
+
+    .sidebar-stack {
+      width: 336px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      box-shadow: var(--shadow-panel);
+      overflow: auto;
+    }
+
+    .panel.small {
+      width: 336px;
+      background: var(--surface-soft);
+      max-height: 700px;
+    }
+
+    .panel.large {
+      flex: 1;
+      min-width: 680px;
+      max-height: none;
+      background: var(--surface);
+    }
+
+    .results-header {
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    label {
+      display: block;
+      margin-top: var(--space-3);
+      color: #1b3358;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    input[type="text"],
+    input[type="file"],
+    select {
+      width: 100%;
+      min-height: 40px;
+      padding: 9px 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-body);
+      background: #fff;
+    }
+
+    input::placeholder {
+      color: #70809c;
+    }
+
+    input[type="file"] {
+      max-width: 360px;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    .upload-controls input[type="file"] {
+      width: 320px;
+    }
+
+    button {
+      min-height: 40px;
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--accent);
+      color: #ffffff;
+      background: linear-gradient(160deg, #2970d5 0%, #1f5fbf 100%);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+    }
+
+    button.secondary {
+      color: #203c67;
+      border-color: #aabada;
+      background: linear-gradient(160deg, #ffffff 0%, #edf3fd 100%);
+    }
+
+    button:hover {
+      background: linear-gradient(160deg, #2367c7 0%, #1a56b0 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(31, 95, 191, 0.22);
+    }
+
+    button.secondary:hover {
+      background: linear-gradient(160deg, #ffffff 0%, #e4ecf9 100%);
+      box-shadow: 0 4px 10px rgba(41, 83, 145, 0.15);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      box-shadow: none;
+      transform: none;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    .file-column:focus-visible {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 1px;
+    }
+
+    .files-list {
+      margin-top: var(--space-2);
+      padding: 9px 11px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: #304a70;
+      font-size: 13px;
+      background: #fdfefe;
+    }
+
+    .files-list.state-empty {
+      color: var(--text-muted);
+      background: #f7faff;
+    }
+
+    .files-list.state-parsing {
+      color: #254d84;
+      background: #ecf4ff;
+      border-color: #b8ceef;
+    }
+
+    .files-list.state-loaded,
+    .files-list.state-matched {
+      color: #1f436f;
+      background: #edf7ff;
+      border-color: #b3d0ea;
+    }
+
+    #results {
+      margin-top: var(--space-4);
+      min-height: 200px;
+    }
+
+    #results:empty::before {
+      content: "Run a table or graph action to display results here.";
+      display: block;
+      padding: 18px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      font-size: 13px;
+      background: #fbfdff;
+    }
+
+    .result-section {
+      padding: var(--space-4);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: #fcfdff;
+    }
+
+    .result-toolbar {
+      margin-bottom: var(--space-3);
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .result-table-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 600px;
+      background: #ffffff;
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+      margin-top: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: auto;
+    }
+
+    th,
+    td {
+      border-right: 1px solid #d9e2f0;
+      border-bottom: 1px solid #d9e2f0;
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      color: #1b3357;
+      word-break: normal;
+      overflow-wrap: normal;
+      background: #fff;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #e9f0fb;
+      color: #102847;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: #f8fbff;
+    }
+
+    td.metric-highlight-cell {
+      background: #dff6df !important;
+    }
+
+    tr > :first-child {
+      border-left: 1px solid #d9e2f0;
+    }
+
+    thead tr:first-child > :first-child {
+      border-top-left-radius: var(--radius-sm);
+    }
+
+    thead tr:first-child > :last-child {
+      border-top-right-radius: var(--radius-sm);
+    }
+
+    .file-column {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid #bfd2eb;
+      background: linear-gradient(140deg, #ffffff 0%, #edf4ff 100%);
+      color: #1f436f;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      cursor: grab;
+      box-shadow: 0 2px 6px rgba(22, 60, 109, 0.11);
+      transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+    }
+
+    .file-column:hover {
+      border-color: #95b8e2;
+      background: linear-gradient(140deg, #ffffff 0%, #e2eeff 100%);
+      transform: translateY(-1px);
+    }
+
+    .controls {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: var(--space-3);
+    }
+
+    .graphs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-4);
+      margin-top: 0;
+    }
+
+    .graph-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      background: var(--surface);
+      box-shadow: 0 2px 8px rgba(20, 45, 76, 0.08);
+      min-height: 250px;
+    }
+
+    .graph-title {
+      margin: 0 0 var(--space-2);
+      color: #133057;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+  </style> <!-- Ends the CSS definitions for the page. -->
+</head>
+<!-- Begins the visible portion of the document presented to the user. -->
+<body>
+  <main class="app-shell">
+    <!-- Displays the main page heading identifying the application. -->
+    <header class="page-header">
+      <h1>Survey CSV Processor &amp; Visualizer</h1>
+      <p class="page-subtitle">Upload multiple survey exports, match files by student name, and generate student or class-level outputs.</p>
+    </header>
+
+    <!-- Creates a horizontal container for the introductory instructions and file controls. -->
+    <section class="topbar">
+      <!-- Wraps the instructional text explaining how the tool behaves. -->
+      <div class="upload-copy">
+        <h2 class="section-title">Upload CSV files</h2>
+        <!-- Provides a note explaining how filters affect displayed table cells. -->
+        <div class="hint">Table cells respect the active filter (column + value). Matched files will show only files containing that value.</div>
+      </div>
+      <!-- Groups the file input and clear button controls. -->
+      <div class="upload-controls">
+        <!-- Offers a file picker allowing multiple CSV files to be selected at once. -->
+        <input id="fileInput" type="file" accept=".csv,text/csv" multiple />
+        <!-- Provides a secondary button to remove all uploaded data and reset the interface. -->
+        <button id="clearAll" class="secondary">Clear All</button>
+      </div>
+    </section>
+
+    <!-- Sets up the main two-column layout containing sidebar controls and results. -->
+    <div class="row">
+      <!-- Stacks student controls and class controls as separate left-side cards. -->
+      <aside class="sidebar-stack">
+        <!-- Defines the student-focused sidebar panel with filtering and student output actions. -->
+        <section class="panel small">
+          <h2 class="panel-title">Student Metrics</h2>
+          <p class="panel-subtitle">Find matching files by full name and build student-level tables or charts.</p>
+          <!-- Labels the uploaded file summary list. -->
+          <label>Uploaded files</label>
+          <!-- Displays status text about currently loaded files. -->
+          <div id="uploadedFiles" class="files-list state-empty">No files uploaded.</div>
+
+          <!-- Prompts the user for the full name used to filter matched files. -->
+          <label for="columnValue">Enter Full Name to search for</label>
+          <!-- Supplies a text input for the user to type the full name they want to match. -->
+          <input id="columnValue" type="text" placeholder='Exact full-name match (trimmed). Case-insensitive' />
+
+          <!-- Groups the buttons that generate student-focused tables or graphs from matched files. -->
+          <div class="controls">
+            <!-- Button to create a tabular view of the selected fields across matched files. -->
+            <button id="createTable">Create Table</button>
+            <!-- Button to generate visual graphs from the selected data fields. -->
+            <button id="createGraph">Create Graph</button>
+          </div>
+        </section>
+
+        <!-- Defines a separate class-level panel positioned below the student panel. -->
+        <section class="panel small">
+          <h2 class="panel-title">Class-level Metrics</h2>
+          <p class="panel-subtitle">Uses all uploaded CSV files and displays only generated class metric rows.</p>
+          <div class="controls">
+            <button id="createClassTable">Create Class Table</button>
+            <button id="createClassGraph">Create Class Graph</button>
+          </div>
+        </section>
+
+        <!-- Defines a panel for downloading processed CSV outputs for one or all uploaded files. -->
+        <section class="panel small">
+          <h2 class="panel-title">Processed Downloads</h2>
+          <p class="panel-subtitle">Export one processed file or download all processed outputs as a ZIP archive.</p>
+          <label for="processedFileSelect">Download processed CSV</label>
+          <select id="processedFileSelect">
+            <option value="">No files loaded</option>
+          </select>
+          <div class="controls">
+            <button id="downloadProcessedCsv">Download Selected</button>
+            <button id="downloadAllProcessedCsv" class="secondary">Download All (ZIP)</button>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Defines the main panel that shows generated outputs. -->
+      <section class="panel large">
+        <div class="results-header">
+          <h2 class="panel-title">Results</h2>
+          <div class="hint">Student outputs include only files where the entered Full Name exists.</div>
+        </div>
+        <!-- Placeholder where generated tables or charts will be inserted. -->
+        <div id="results"></div>
+      </section>
+    </div>
+  </main>
+
+<!-- Starts the script block containing all interactive logic for the tool. -->
+<script>
+// Defines a mapping that assigns numeric order values to semester labels for consistent sorting.
+const semesterOrder = {
+  "SpringA": 0, // Maps the SpringA semester to the earliest sort position.
+  "SpringB": 1, // Maps SpringB to follow SpringA when sorting.
+  "SpringC": 2, // Maps SpringC to the third spring slot in the order.
+  "SummerA": 3, // Assigns the first summer term a position after the spring terms.
+  "SummerB": 4, // Assigns the second summer term the next sequential position.
+  "SummerC": 5, // Assigns the third summer term to follow SummerB.
+  "FallA": 6, // Places the first fall term after all spring and summer entries.
+  "FallB": 7, // Places the second fall term after FallA.
+  "FallC": 8 // Places the final fall term at the end of the order list.
+}; // Closes the semester ordering configuration object.
+
+const COURSE_HIGHLIGHT_LETTERS = new Map([
+  ['SPE525', new Set(['C', 'D'])], // Highlights C and D groups for SPE525 files.
+  ['SPE526', new Set(['B'])], // Highlights B groups for SPE526 files.
+  ['SPE528', new Set(['F', 'G', 'H'])], // Highlights F/G/H groups for SPE528 files.
+  ['SPE529', new Set(['F', 'G', 'H'])], // Highlights F/G/H groups for SPE529 files.
+  ['SPE530', new Set(['I'])], // Highlights I groups for SPE530 files.
+  ['SPE563', new Set(['A'])], // Highlights A groups for SPE563 files.
+  ['SPE567', new Set(['E'])] // Highlights E groups for SPE567 files.
+]); // Maps course codes to the assessment letters that should render with green highlights.
+const EMPTY_HIGHLIGHT_LETTERS = new Set(); // Provides a shared immutable empty set for unmapped files.
+const GRAPH_BAR_DEFAULT_BACKGROUND = 'rgba(41, 112, 213, 0.6)'; // Defines the default bar fill used when a metric is not highlighted.
+const GRAPH_BAR_DEFAULT_BORDER = '#1f5fbf'; // Defines the default bar border color for non-highlighted metrics.
+const GRAPH_BAR_HIGHLIGHT_BACKGROUND = 'rgba(75, 166, 89, 0.75)'; // Defines the green bar fill used for highlighted metrics.
+const GRAPH_BAR_HIGHLIGHT_BORDER = '#2f7f3b'; // Defines the green bar border used for highlighted metrics.
+
+// Extracts course codes such as "SPE525" from a base filename.
+function extractCourseCode(baseName) {
+  const base = String(baseName || '').trim(); // Normalizes filename input to a predictable string.
+  if (!base) return null; // Returns null when no filename text is available.
+  const parts = base.split('_'); // Splits on underscores to inspect structured filename tokens first.
+  const tokenMatch = parts.find(part => /^SPE\d{3}$/i.test(String(part || '').trim())); // Prefers exact SPE tokens when present.
+  if (tokenMatch) return tokenMatch.toUpperCase(); // Returns normalized uppercase course token from underscore segments.
+  const fallbackMatch = /SPE\d{3}/i.exec(base); // Falls back to regex scanning for filenames with extra text around the course code.
+  return fallbackMatch ? fallbackMatch[0].toUpperCase() : null; // Returns normalized course code or null when no match exists.
+} // Ends helper that derives course code from filename text.
+
+// Parses a filename into year and semester components to assist in sorting.
+function parseFileNameKey(name) {
+  const base = name.replace(/\.[^/.]+$/, ""); // Removes the file extension to analyze the core filename.
+  const parts = base.split("_"); // Splits the base name on underscores to inspect structured naming conventions.
+  const courseCode = extractCourseCode(base); // Attempts to parse a course code like SPE525 from the filename.
+  if (parts.length >= 3) { // Checks if the filename appears to follow the YEAR_SEMESTER pattern.
+    const year = parseInt(parts[0], 10); // Attempts to interpret the first segment as a numeric year.
+    const semester = parts[1]; // Treats the second segment as the semester label.
+    return {year: isNaN(year)?null:year, semester, fileLabel: base, courseCode}; // Returns parsed metadata including year, semester, label, and course code.
+  }
+  const yearMatch = base.match(/(19|20)\d{2}/); // Searches for any four-digit year starting with 19 or 20 within the filename.
+  const year = yearMatch ? parseInt(yearMatch[0],10) : null; // Extracts and parses the matched year if present.
+  return {year, semester: null, fileLabel: base, courseCode}; // Falls back to returning base label plus course code when semester is absent.
+} // Ends the helper that derives sorting metadata from filenames.
+// Determines the correct ordering between two parsed filename records using year, semester, and name fallback.
+function semesterSortKey(a, b) {
+  if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) - (b.year || 0); // Primarily sorts by year, handling null years as zero.
+  const aOrd = a.semester && semesterOrder.hasOwnProperty(a.semester) ? semesterOrder[a.semester] : 999; // Resolves the numeric order for the first semester or defaults to a large value.
+  const bOrd = b.semester && semesterOrder.hasOwnProperty(b.semester) ? semesterOrder[b.semester] : 999; // Resolves the numeric order for the second semester or defaults to a large value.
+  if (aOrd !== bOrd) return aOrd - bOrd; // If semesters differ, orders by their mapped numeric values.
+  if ((a.fileLabel || "") < (b.fileLabel || "")) return -1; // Uses the file label alphabetically as a tiebreaker when earlier.
+  if ((a.fileLabel || "") > (b.fileLabel || "")) return 1; // Uses the file label alphabetically as a tiebreaker when later.
+  return 0; // Treats the records as equal if year, semester, and labels match.
+} // Ends the comparison function used for ordering files.
+
+// Parses survey assessment headers such as "A-1 ..." or "I-Mean".
+function parseAssessmentHeader(headerName) {
+  const header = String(headerName || '').trim(); // Normalizes undefined or null inputs into a trimmed string.
+  const numberedMatch = /^([A-I])-(\d+)\b/i.exec(header); // Detects numbered assessment headers from A through I.
+  if (numberedMatch) {
+    return { letter: numberedMatch[1].toUpperCase(), kind: 'numbered', number: Number(numberedMatch[2]) }; // Returns a structured descriptor for numbered headers.
+  }
+  const metricMatch = /^([A-I])-(Mean|Median|Min|Max|StdDev)\b/i.exec(header); // Detects computed statistic headers for letters A through I, allowing trailing prompt text.
+  if (metricMatch) {
+    const metricName = metricMatch[2];
+    const normalizedMetric = metricName.charAt(0).toUpperCase() + metricName.slice(1).toLowerCase(); // Normalizes metric casing while preserving the "StdDev" acronym later.
+    return {
+      letter: metricMatch[1].toUpperCase(),
+      kind: 'metric',
+      metric: normalizedMetric === 'Stddev' ? 'StdDev' : normalizedMetric,
+      number: null
+    }; // Returns a structured descriptor for statistic headers.
+  }
+  return null; // Indicates the header is outside the assessment allowlist.
+} // Ends the parser that classifies assessment headers.
+
+// Returns highlight-target assessment letters for a file based on its parsed course code.
+function getHighlightLettersForFile(fileKey) {
+  const data = filesData.get(fileKey); // Retrieves parsed file data so filename metadata can be inspected.
+  const courseCode = (data && data.parsedName && data.parsedName.courseCode) ? String(data.parsedName.courseCode).toUpperCase() : null; // Reads normalized course code from parsed filename metadata.
+  if (!courseCode) return EMPTY_HIGHLIGHT_LETTERS; // Returns no highlights when course code is missing.
+  return COURSE_HIGHLIGHT_LETTERS.get(courseCode) || EMPTY_HIGHLIGHT_LETTERS; // Uses mapped highlight letters or none for unmapped courses.
+} // Ends helper that resolves per-file highlight letter groups.
+
+// Determines whether a student field should be highlighted for a specific file.
+function shouldHighlightStudentField(fileKey, fieldName) {
+  const parsedField = parseAssessmentHeader(fieldName); // Parses field names like C-1 or C-Mean to identify assessment letter group.
+  if (!parsedField) return false; // Skips non-assessment fields such as All-* or unrelated columns.
+  const highlightLetters = getHighlightLettersForFile(fileKey); // Retrieves mapped highlight letters for the file's course code.
+  return highlightLetters.has(parsedField.letter); // Highlights when the field letter matches mapped course-specific targets.
+} // Ends helper that classifies student table/chart highlight cells and bars.
+
+// Parses generated class metric row keys such as "C-1-Mean" and "C-Mean-StdDev".
+function parseClassMetricRowKey(classMetricRowKey) {
+  const key = String(classMetricRowKey || '').trim(); // Normalizes row-key input before parsing.
+  const metricMatch = /^(.*)-(Mean|Median|Min|Max|StdDev)$/i.exec(key); // Splits row key into source header and trailing metric suffix.
+  if (!metricMatch) return null; // Returns null when row key is outside expected generated class-metric format.
+  const sourceHeader = metricMatch[1]; // Extracts source header prefix such as C-1 or C-Mean.
+  const parsedSource = parseAssessmentHeader(sourceHeader); // Parses the source header to identify assessment letter grouping.
+  if (!parsedSource) return null; // Excludes non-assessment-derived rows (for example, All-Mean-*).
+  const metricName = metricMatch[2]; // Reads trailing metric label for completeness of returned descriptor.
+  const normalizedMetric = metricName.charAt(0).toUpperCase() + metricName.slice(1).toLowerCase(); // Normalizes metric casing consistently with other parsers.
+  return { source: parsedSource, metric: normalizedMetric === 'Stddev' ? 'StdDev' : normalizedMetric }; // Returns parsed source and metric descriptors.
+} // Ends helper that parses generated class-metric row names.
+
+// Determines whether a class metric row should be highlighted for a specific file.
+function shouldHighlightClassMetricRow(fileKey, classMetricRowKey) {
+  const parsedRowKey = parseClassMetricRowKey(classMetricRowKey); // Parses generated class row key to identify its assessment letter source.
+  if (!parsedRowKey) return false; // Skips rows that are not assessment-letter derived.
+  const highlightLetters = getHighlightLettersForFile(fileKey); // Retrieves mapped highlight letters for the current file.
+  return highlightLetters.has(parsedRowKey.source.letter); // Highlights when source assessment letter belongs to the mapped course group.
+} // Ends helper that classifies class table/chart highlight cells and bars.
+
+// Parses overall summary headers such as "All-Mean" and tolerates trailing descriptive text.
+function parseAllSummaryHeader(headerName) {
+  const header = String(headerName || '').trim(); // Normalizes undefined or null inputs into a trimmed string.
+  const allMetricMatch = /^All-(Mean|Median|Min|Max|StdDev)\b/i.exec(header); // Detects overall summary statistic headers while allowing extra trailing words.
+  if (!allMetricMatch) return null; // Returns null when the header is not an overall summary metric.
+  const metricName = allMetricMatch[1]; // Extracts the metric token from the matched header.
+  const normalizedMetric = metricName.charAt(0).toUpperCase() + metricName.slice(1).toLowerCase(); // Normalizes metric casing consistently.
+  return { metric: normalizedMetric === 'Stddev' ? 'StdDev' : normalizedMetric }; // Returns the parsed overall metric descriptor.
+} // Ends the helper that parses overall summary headers.
+
+// Converts known assessment and overall summary headers to canonical short names.
+function canonicalizeHeaderName(headerName) {
+  const parsedAssessment = parseAssessmentHeader(headerName); // Parses assessment headers such as A-1 and A-Mean.
+  if (parsedAssessment) {
+    if (parsedAssessment.kind === 'numbered') return `${parsedAssessment.letter}-${parsedAssessment.number}`; // Canonicalizes numbered assessment headers to short labels like A-1.
+    if (parsedAssessment.kind === 'metric') return `${parsedAssessment.letter}-${parsedAssessment.metric}`; // Canonicalizes section metric headers to short labels like A-Mean.
+  }
+  const parsedAllSummary = parseAllSummaryHeader(headerName); // Parses overall summary headers such as All-Mean.
+  if (parsedAllSummary) return `All-${parsedAllSummary.metric}`; // Canonicalizes overall summary headers to short labels like All-Mean.
+  return String(headerName || '').trim(); // Leaves unrelated headers unchanged.
+} // Ends the header canonicalization helper.
+
+// Sorts assessment headers by letter, then numbered items, then section metrics.
+function sortAssessmentHeaders(headers) {
+  const letterOrder = {A:0,B:1,C:2,D:3,E:4,F:5,G:6,H:7,I:8}; // Defines the fixed order expected for assessment sections.
+  const metricOrder = {Mean:0, Median:1, Min:2, Max:3, StdDev:4}; // Defines the desired ordering for computed statistics within each letter.
+  return Array.from(headers).sort((a,b) => {
+    const pa = parseAssessmentHeader(a); // Parses the first header for structured comparison.
+    const pb = parseAssessmentHeader(b); // Parses the second header for structured comparison.
+    if (!pa && !pb) return String(a).localeCompare(String(b), undefined, {sensitivity:'base'}); // Falls back to alphabetic sort when neither header is recognized.
+    if (!pa) return 1; // Places unrecognized headers after recognized ones.
+    if (!pb) return -1; // Places recognized headers before unrecognized ones.
+    const la = Object.prototype.hasOwnProperty.call(letterOrder, pa.letter) ? letterOrder[pa.letter] : 999; // Resolves the numeric order for the first letter.
+    const lb = Object.prototype.hasOwnProperty.call(letterOrder, pb.letter) ? letterOrder[pb.letter] : 999; // Resolves the numeric order for the second letter.
+    if (la !== lb) return la - lb; // Orders by assessment letter first.
+    if (pa.kind !== pb.kind) return pa.kind === 'numbered' ? -1 : 1; // Ensures numbered headers appear before computed metrics for the same letter.
+    if (pa.kind === 'numbered' && pb.kind === 'numbered' && pa.number !== pb.number) return pa.number - pb.number; // Orders numbered items by their numeric suffix.
+    if (pa.kind === 'metric' && pb.kind === 'metric') {
+      const ma = Object.prototype.hasOwnProperty.call(metricOrder, pa.metric) ? metricOrder[pa.metric] : 999; // Resolves ordering for the first metric label.
+      const mb = Object.prototype.hasOwnProperty.call(metricOrder, pb.metric) ? metricOrder[pb.metric] : 999; // Resolves ordering for the second metric label.
+      if (ma !== mb) return ma - mb; // Orders section metrics in the required Mean/Median/Min/Max/StdDev sequence.
+    }
+    return String(a).localeCompare(String(b), undefined, {sensitivity:'base'}); // Uses a stable tie-breaker when all structured keys match.
+  });
+} // Ends the helper that orders assessment headers predictably.
+
+// Computes basic descriptive statistics for a list of values using population standard deviation.
+function computeStats(values) {
+  const numericValues = values.map(v => Number(String(v ?? '').trim())).filter(v => !Number.isNaN(v)); // Converts values to numbers and drops invalid conversions.
+  if (numericValues.length === 0) return {mean:0, median:0, min:0, max:0, stdDev:0}; // Returns zeroed stats when no usable values are present.
+  const count = numericValues.length; // Captures the number of valid values participating in calculations.
+  const sum = numericValues.reduce((acc, value) => acc + value, 0); // Sums all numeric values for mean calculation.
+  const mean = sum / count; // Computes the arithmetic mean.
+  const sorted = numericValues.slice().sort((a,b) => a-b); // Sorts values ascending for median and bounds.
+  const middle = Math.floor(sorted.length / 2); // Finds the central index used for median logic.
+  const median = sorted.length % 2 === 0 ? (sorted[middle-1] + sorted[middle]) / 2 : sorted[middle]; // Computes median for even and odd counts.
+  const min = sorted[0]; // Retrieves the minimum value from the sorted list.
+  const max = sorted[sorted.length - 1]; // Retrieves the maximum value from the sorted list.
+  const variance = numericValues.reduce((acc, value) => {
+    const diff = value - mean; // Measures deviation from the mean for each value.
+    return acc + (diff * diff); // Accumulates squared deviations for population variance.
+  }, 0) / count; // Divides by N to produce population variance.
+  const stdDev = Math.sqrt(variance); // Computes population standard deviation from variance.
+  return {mean, median, min, max, stdDev}; // Returns all computed statistics.
+} // Ends the statistics helper.
+
+// Defines the metric suffix order used when generating and displaying class-level rows.
+const CLASS_METRIC_NAMES = ['Mean', 'Median', 'Min', 'Max', 'StdDev'];
+
+// Determines whether an assessment header is eligible as a source for class-level row generation.
+function isClassMetricSourceHeader(headerName) {
+  const parsed = parseAssessmentHeader(headerName); // Parses the header to identify numbered and metric assessment columns.
+  if (parsed) {
+    if (parsed.kind === 'numbered') return true; // Allows A-I numbered columns as class-metric row sources.
+    if (parsed.kind === 'metric' && parsed.metric === 'Mean') return true; // Allows only A-I section means, excluding section median/min/max/stddev columns.
+  }
+  const parsedAllSummary = parseAllSummaryHeader(headerName); // Parses overall summary headers such as All-Mean.
+  return !!(parsedAllSummary && parsedAllSummary.metric === 'Mean'); // Includes All-Mean as a class source while excluding All-Median/Min/Max/StdDev.
+} // Ends the helper that identifies class-level source columns.
+
+// Determines whether a row object represents a generated class-level metric row.
+function isClassMetricRow(row) {
+  return !!(row && row.__isClassMetricRow); // Uses the internal marker set during preprocessing to classify rows.
+} // Ends the helper that classifies generated class rows.
+
+// Returns a stable sorted copy of file keys based on filename year/semester parsing.
+function getSortedFileKeys(fileKeys) {
+  const parsed = fileKeys.map(k => ({key:k, parsed: (filesData.get(k) && filesData.get(k).parsedName) || parseFileNameKey(k)})); // Associates each key with parsed ordering metadata.
+  parsed.sort((x,y) => semesterSortKey(x.parsed, y.parsed)); // Applies the semester-aware ordering comparator.
+  return parsed.map(x => x.key); // Returns only the sorted file keys.
+} // Ends the helper that sorts file keys for rendering.
+
+// Gets the file order for class output using deterministic year/semester sorting.
+function getOrderForAllFiles() {
+  const allKeys = Array.from(filesData.keys()); // Captures all uploaded file keys.
+  if (allKeys.length === 0) return []; // Returns empty order when no files are loaded.
+  return getSortedFileKeys(allKeys); // Uses deterministic year/semester sorting for class-level outputs.
+} // Ends the helper that determines ordering for class-level outputs.
+
+// Formats numeric metric values for compact, readable display in tables and labels.
+function formatMetricValue(value) {
+  if (value === undefined || value === null || value === '') return ''; // Normalizes empty values to blank strings for display.
+  const numeric = typeof value === 'number' ? value : Number(String(value).trim()); // Converts non-number values into numbers when possible.
+  if (Number.isNaN(numeric)) return String(value); // Falls back to raw text when conversion fails.
+  return Number.parseFloat(numeric.toFixed(4)).toString(); // Rounds numeric values to four decimals while trimming trailing zeros.
+} // Ends the helper that formats metric values consistently.
+
+// Stores parsed file contents keyed by filename for reuse across interactions.
+const filesData = new Map();
+// References the file input element for capturing uploaded CSV files.
+const fileInput = document.getElementById('fileInput');
+// References the status display showing which files are loaded.
+const uploadedFiles = document.getElementById('uploadedFiles');
+// References the text input where the user enters the value to filter on.
+const columnValue = document.getElementById('columnValue');
+// References the button that creates the comparison table.
+const createTableBtn = document.getElementById('createTable');
+// References the button that triggers graph generation.
+const createGraphBtn = document.getElementById('createGraph');
+// References the button that builds a class-level comparison table.
+const createClassTableBtn = document.getElementById('createClassTable');
+// References the button that builds class-level comparison graphs.
+const createClassGraphBtn = document.getElementById('createClassGraph');
+// References the dropdown used to choose a processed file for download.
+const processedFileSelect = document.getElementById('processedFileSelect');
+// References the button that downloads the selected processed CSV.
+const downloadProcessedCsvBtn = document.getElementById('downloadProcessedCsv');
+// References the button that downloads every processed CSV as a ZIP archive.
+const downloadAllProcessedCsvBtn = document.getElementById('downloadAllProcessedCsv');
+// References the div where tables or charts are rendered.
+const resultsDiv = document.getElementById('results');
+// References the button that clears all uploaded data.
+const clearAllBtn = document.getElementById('clearAll');
+// Uses a fixed matching column instead of a user-selected filter column.
+const FIXED_FILTER_COLUMN = 'Full Name';
+
+const uploadFilesStateClasses = ['state-empty', 'state-parsing', 'state-loaded', 'state-matched']; // Lists supported visual states for the upload status badge.
+
+// Updates the uploaded-files status text and swaps state classes for styling.
+function setUploadedFilesStatus(message, state) {
+  for (const className of uploadFilesStateClasses) uploadedFiles.classList.remove(className); // Removes stale state classes before applying the next state.
+  uploadedFiles.classList.add(uploadFilesStateClasses.includes(state) ? state : 'state-empty'); // Applies a valid state class or falls back to empty.
+  uploadedFiles.textContent = message; // Writes status text as plain text to avoid HTML injection.
+} // Ends helper that manages upload status messaging and styling state.
+
+// Clears the results area and removes the current view marker used for styling hooks.
+function clearResultsView() {
+  resultsDiv.innerHTML = ''; // Removes existing rendered table/chart output.
+  resultsDiv.removeAttribute('data-view'); // Clears the current view marker when results are reset.
+} // Ends helper that resets output view state.
+
+// Finds files containing the current Full Name input and returns deterministic sorted matches.
+function getMatchedFilesForCurrentFullName() {
+  if (filesData.size === 0) { alert('Upload files first.'); return null; } // Prevents matching before any files are loaded.
+  const fullNameInput = (columnValue.value || "").trim(); // Reads and trims the entered full name.
+  if (!fullNameInput) { alert('Enter a Full Name before creating output.'); return null; } // Requires a full name for student-level output generation.
+  const hasFullNameColumn = Array.from(filesData.values()).some(d => d && d.headers.includes(FIXED_FILTER_COLUMN)); // Checks whether uploaded files include the fixed matching column.
+  if (!hasFullNameColumn) { alert(`Filtering requires the "${FIXED_FILTER_COLUMN}" column in uploaded files.`); return null; } // Prevents matching when Full Name is unavailable.
+
+  const searchVal = fullNameInput.toLowerCase(); // Normalizes the full-name input for case-insensitive matching.
+  const found = []; // Collects filenames that contain the requested full name.
+  for (const [fname, data] of filesData.entries()) { // Iterates through each uploaded file dataset.
+    const rows = data.rows.filter(r => !isClassMetricRow(r)); // Restricts matching to student rows only.
+    const anyMatch = rows.some(r => { // Checks whether any student row matches the requested full name.
+      const value = (r[FIXED_FILTER_COLUMN] !== undefined && r[FIXED_FILTER_COLUMN] !== null) ? String(r[FIXED_FILTER_COLUMN]).trim().toLowerCase() : ""; // Normalizes row full-name value for comparison.
+      return value === searchVal; // Matches exact trimmed case-insensitive full name.
+    });
+    if (anyMatch) found.push(fname); // Keeps files with at least one matching student row.
+  }
+
+  const sortedMatches = getSortedFileKeys(found); // Applies deterministic year/semester ordering for output columns.
+  if (sortedMatches.length === 0) { // Handles no-match outcomes for student outputs.
+    clearResultsView(); // Clears previous output when no files match.
+    setUploadedFilesStatus(`0 files matched for "${fullNameInput}".`, 'state-matched'); // Reflects no-match result in status text.
+    alert('No files contain that Full Name value.'); // Preserves alert-based validation behavior.
+    return []; // Returns empty list so caller can stop rendering.
+  }
+  setUploadedFilesStatus(`${sortedMatches.length} file(s) matched for "${fullNameInput}".`, 'state-matched'); // Reports matched-file count for the current full name.
+  return sortedMatches; // Returns sorted matched files for table/graph generation.
+} // Ends helper that resolves matched files from current Full Name input.
+
+// Builds a processed export filename by adding a "_processed" suffix before the extension.
+function getProcessedExportFileName(originalName) {
+  const trimmed = String(originalName || '').trim(); // Normalizes incoming filename text.
+  if (!trimmed) return 'processed.csv'; // Falls back to a stable name when no input is provided.
+  if (/\.csv$/i.test(trimmed)) return trimmed.replace(/\.csv$/i, '_processed.csv'); // Preserves CSV extension while appending the processed suffix.
+  return `${trimmed}_processed.csv`; // Adds a CSV extension when missing.
+} // Ends helper that computes processed export filenames.
+
+// Serializes one processed dataset to CSV using its retained headers and processed rows.
+function processedDataToCSV(data) {
+  if (!data || !Array.isArray(data.headers) || !Array.isArray(data.rows)) return ''; // Handles malformed or missing data safely.
+  const lines = []; // Collects CSV output rows.
+  lines.push(data.headers.map(csvEscape).join(',')); // Writes the processed header row.
+  for (const row of data.rows) { // Writes all processed rows, including generated class metric rows.
+    const out = data.headers.map(h => csvEscape(row[h] !== undefined ? row[h] : '')); // Keeps output strictly aligned with retained processed headers.
+    lines.push(out.join(',')); // Appends the serialized row.
+  }
+  return lines.join('\n'); // Returns the final CSV text.
+} // Ends helper that serializes processed file data.
+
+// Downloads a Blob object with a provided filename.
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob); // Creates a temporary URL to the blob data.
+  const a = document.createElement('a'); // Builds a temporary anchor to trigger browser download.
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); // Triggers the file save then cleans up the temporary element.
+  setTimeout(() => URL.revokeObjectURL(url), 1000); // Releases the object URL shortly after download starts.
+} // Ends helper that downloads binary content.
+
+// Refreshes the processed-file download controls to match currently loaded files.
+function refreshProcessedDownloadControls() {
+  const previousValue = processedFileSelect.value; // Captures current selection so it can be preserved when possible.
+  const sortedKeys = getSortedFileKeys(Array.from(filesData.keys())); // Uses deterministic file ordering in the dropdown.
+  processedFileSelect.innerHTML = ''; // Clears stale options before rebuilding.
+  if (sortedKeys.length === 0) {
+    const emptyOpt = document.createElement('option'); // Creates the placeholder option when no files are loaded.
+    emptyOpt.value = '';
+    emptyOpt.textContent = 'No files loaded';
+    processedFileSelect.appendChild(emptyOpt);
+    processedFileSelect.disabled = true; // Disables selection when nothing is available.
+    downloadProcessedCsvBtn.disabled = true; // Disables single download when no files are loaded.
+    downloadAllProcessedCsvBtn.disabled = true; // Disables bulk download when no files are loaded.
+    return; // Finishes early for empty state.
+  }
+  const pickOpt = document.createElement('option'); // Creates placeholder prompting explicit file selection.
+  pickOpt.value = '';
+  pickOpt.textContent = 'Select a file';
+  processedFileSelect.appendChild(pickOpt);
+  for (const fname of sortedKeys) { // Adds each processed file option in sorted order.
+    const opt = document.createElement('option');
+    opt.value = fname;
+    opt.textContent = fname;
+    processedFileSelect.appendChild(opt);
+  }
+  processedFileSelect.disabled = false; // Enables file selection once files exist.
+  downloadProcessedCsvBtn.disabled = false; // Enables single download button.
+  downloadAllProcessedCsvBtn.disabled = false; // Enables zip download button.
+  if (sortedKeys.includes(previousValue)) processedFileSelect.value = previousValue; // Restores prior selection when still valid.
+} // Ends helper that keeps processed download controls in sync.
+
+refreshProcessedDownloadControls(); // Initializes processed download controls for the initial empty page state.
+
+// Reacts when the user selects files, parses them, and updates the interface state.
+fileInput.addEventListener('change', async (ev) => {
+  const files = Array.from(ev.target.files); // Converts the FileList to a regular array for iteration.
+  if (files.length === 0) return; // Exits early if no files were selected.
+  clearResultsView(); // Clears any previously generated output and resets styling hooks.
+  setUploadedFilesStatus(`Parsing ${files.length} file(s)...`, 'state-parsing'); // Shows feedback that parsing is in progress.
+  await parseAndProcessFiles(files); // Parses each selected file and loads them into memory.
+  setUploadedFilesStatus(`${filesData.size} file(s) loaded.`, 'state-loaded'); // Displays the total count of successfully loaded files.
+  refreshProcessedDownloadControls(); // Updates processed download controls with the newly loaded file set.
+}); // Ends the change listener for handling new file uploads.
+
+// Clears all loaded data and restores the interface to its initial state when invoked.
+clearAllBtn.addEventListener('click', () => {
+  filesData.clear(); // Removes all parsed file data from memory.
+  setUploadedFilesStatus('No files uploaded.', 'state-empty'); // Updates the status text to reflect the cleared state.
+  clearResultsView(); // Removes any tables or graphs previously shown.
+  fileInput.value = ''; // Resets the file input so the same files can be reselected if desired.
+  refreshProcessedDownloadControls(); // Resets processed download controls to the empty state.
+}); // Ends the handler for the Clear All button.
+
+// Builds automatic row selection as all assessment fields plus All-* metrics, excluding Full Name.
+function getAutoSelectedFields(fileKeys) {
+  const allMetrics = ['All-Mean', 'All-Median', 'All-Min', 'All-Max', 'All-StdDev']; // Defines fixed ordering for overall summary metrics.
+  const union = new Set(); // Collects unique headers present across matched files.
+  for (const fname of fileKeys) { // Iterates through each matched filename.
+    const d = filesData.get(fname); // Retrieves the parsed data for the current file.
+    if (!d) continue; // Skips files that might be missing due to data inconsistency.
+    for (const h of d.headers) {
+      if (h === 'Full Name') continue; // Keeps Full Name out of automatic output row selections.
+      if (allMetrics.includes(h)) { union.add(h); continue; } // Retains overall All-* statistic rows in automatic output selections.
+      if (!parseAssessmentHeader(h)) continue; // Restricts automatic choices to assessment fields and totals only.
+      union.add(h); // Adds valid assessment headers from the file to the union set.
+    }
+  }
+  const orderedAssessment = sortAssessmentHeaders(Array.from(union).filter(h => !allMetrics.includes(h))); // Orders A-I assessment fields first while excluding overall metrics temporarily.
+  for (const metricName of allMetrics) {
+    if (union.has(metricName)) orderedAssessment.push(metricName); // Appends overall metrics in the required fixed order at the end.
+  }
+  return orderedAssessment; // Produces a predictable row order for automatic table and graph usage.
+} // Ends the helper that computes automatic output rows.
+
+// Builds the ordered list of generated class metric row names (for example, "A-1-Mean") across files.
+function getAutoSelectedClassMetricRows(fileKeys) {
+  const sourceUnion = new Set(); // Collects unique class-metric source headers from all requested files.
+  const availableClassRows = new Set(); // Tracks which generated class metric row keys actually exist.
+  for (const fname of fileKeys) { // Iterates through each requested filename.
+    const d = filesData.get(fname); // Retrieves processed data for the current file.
+    if (!d) continue; // Skips missing data entries defensively.
+    for (const sourceHeader of (d.classMetricSourceHeaders || [])) sourceUnion.add(sourceHeader); // Adds each eligible source header (A-numbered and A-I means).
+    const valuesMap = d.classMetricValues || {}; // Reads generated class metric values for this file.
+    for (const key of Object.keys(valuesMap)) availableClassRows.add(key); // Registers generated row keys that can be rendered.
+  }
+  const orderedSources = sortAssessmentHeaders(Array.from(sourceUnion)); // Orders source headers in the same A-I/numbered/metric sequence.
+  const orderedRows = []; // Stores the final ordered class metric row keys.
+  for (const sourceHeader of orderedSources) { // Iterates through source headers in deterministic order.
+    for (const metricName of CLASS_METRIC_NAMES) { // Appends metrics in Mean/Median/Min/Max/StdDev order.
+      const rowKey = `${sourceHeader}-${metricName}`; // Reconstructs the generated class row key.
+      if (availableClassRows.has(rowKey)) orderedRows.push(rowKey); // Keeps only rows that are present in at least one file.
+    }
+  }
+  return orderedRows; // Returns class rows ready for class table and class graph rendering.
+} // Ends the helper that computes class-level output rows.
+
+// Looks up a generated class metric value from a file dataset by row key.
+function getClassMetricValueForFile(data, classMetricKey) {
+  if (!data || !data.classMetricValues) return null; // Returns null when class metrics are unavailable.
+  return Object.prototype.hasOwnProperty.call(data.classMetricValues, classMetricKey) ? data.classMetricValues[classMetricKey] : null; // Reads the generated metric value when present.
+} // Ends the helper that fetches class metric values safely.
+
+// Parses each uploaded file, cleans the data, and stores it for future use.
+async function parseAndProcessFiles(fileList) {
+  filesData.clear(); // Clears any previously stored file data before processing the new set.
+  for (const f of fileList) { // Iterates through each uploaded file.
+    await new Promise((res, rej) => {
+      Papa.parse(f, {
+        skipEmptyLines: false, // Keeps empty lines so header detection can evaluate row density accurately.
+        complete: function(results) {
+          try {
+            const arr = results.data.map(row => row.map(cell => cell === undefined ? '' : cell)); // Normalizes parsed CSV rows, replacing undefined cells with empty strings.
+            let maxNonEmpty = -1; // Tracks the highest number of non-empty cells found in any row.
+            for (let i=0;i<arr.length;i++) { // Iterates through rows to count filled cells.
+              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0); // Counts how many cells in the row contain actual data.
+              if (nonEmpty > maxNonEmpty) maxNonEmpty = nonEmpty; // Updates the maximum when a denser row is found.
+            }
+            let headerRowIndex = null; // Will store the index of the row chosen as the header.
+            for (let i=0;i<arr.length;i++) { // Searches again to locate the row with the highest density.
+              const nonEmpty = arr[i].reduce((acc,v)=> acc + (String(v||'').trim() !== '' ? 1 : 0), 0); // Recomputes the non-empty count for the row.
+              if (nonEmpty === maxNonEmpty) { headerRowIndex = i; break; } // Picks the first row with the maximum non-empty cells as the header.
+            }
+            if (headerRowIndex === null) headerRowIndex = 0; // Falls back to the first row if no suitable header was identified.
+            const rawHeader = arr[headerRowIndex].map(h => String(h || '').trim()); // Extracts and trims header names from the chosen row.
+            const canonicalHeader = rawHeader.map(h => canonicalizeHeaderName(h)); // Converts assessment and summary headers to canonical short forms.
+            const uniqueCanonicalHeaders = Array.from(new Set(canonicalHeader.filter(h => h))); // Keeps one entry per canonical header while dropping blanks.
+            const dataRows = arr.slice(headerRowIndex+1); // Gathers all rows following the header for data processing.
+            const mappedRows = dataRows.map(r => {
+              const obj = {}; // Prepares an object to represent the row keyed by header names.
+              for (let i=0;i<canonicalHeader.length;i++) { // Assigns row values using canonical header names.
+                const headerKey = canonicalHeader[i]; // Reads the canonicalized header key for this column index.
+                if (!headerKey) continue; // Skips blank headers.
+                const nextValue = (i < r.length) ? r[i] : ''; // Reads value from the current row, defaulting to empty string when missing.
+                if (!Object.prototype.hasOwnProperty.call(obj, headerKey)) { obj[headerKey] = nextValue; continue; } // Writes first occurrence for this canonical header.
+                const existingValue = obj[headerKey]; // Reads the existing value when duplicate canonical headers are present.
+                if (String(existingValue || '').trim() === '' && String(nextValue || '').trim() !== '') obj[headerKey] = nextValue; // Prefers non-empty values when duplicates collide.
+              }
+              return obj; // Returns the constructed row object for inclusion in the dataset.
+            }); // Ends the mapping that converts arrays into header-keyed objects.
+            const statusColName = uniqueCanonicalHeaders.find(h => h.toLowerCase() === 'response status'); // Looks for a column explicitly named "Response Status" in a case-insensitive way.
+            let filteredRows = mappedRows; // Starts with all mapped rows prior to filtering.
+            if (statusColName) {
+              filteredRows = mappedRows.filter(r => {
+                const v = (r[statusColName] || '').toString().trim(); // Retrieves and trims the response status value for the row.
+                return v.toLowerCase() === 'completed'; // Keeps only rows where the response status indicates completion.
+              }); // Ends the filter that removes incomplete responses when the column exists.
+            }
+            const nonEmptyHeaders = []; // Tracks source headers that still contain non-empty data after row filtering.
+            for (const h of uniqueCanonicalHeaders) {
+              const anyData = filteredRows.some(r => {
+                const v = r[h]; // Reads the value for the current header in this row.
+                return v !== undefined && v !== null && String(v).trim() !== ''; // Checks whether any non-empty data exists for the header.
+              }); // Ends the search for non-empty values under this header.
+              if (anyData) nonEmptyHeaders.push(h); // Keeps headers that actually contain meaningful data.
+            }
+            const hasFirst = nonEmptyHeaders.find(h => h.toLowerCase() === 'first name'); // Detects if a "First Name" column remains after filtering.
+            const hasLast = nonEmptyHeaders.find(h => h.toLowerCase() === 'last name'); // Detects if a "Last Name" column remains after filtering.
+            if (hasFirst || hasLast) {
+              filteredRows = filteredRows.map(r => {
+                const f = hasFirst ? (r[hasFirst] || '') : ''; // Retrieves the first-name value when present.
+                const l = hasLast ? (r[hasLast] || '') : ''; // Retrieves the last-name value when present.
+                r['Full Name'] = (String(f).trim() + ' ' + String(l).trim()).trim().toLowerCase(); // Builds a normalized full-name string for consistent comparison.
+                return r; // Returns the augmented row object including the Full Name field.
+              }); // Ends the mapping that adds a Full Name column for matching purposes.
+            }
+
+            const assessmentNumberedHeaders = nonEmptyHeaders.filter(h => {
+              const parsedHeader = parseAssessmentHeader(h); // Parses each non-empty header to test assessment allowlist eligibility.
+              return parsedHeader && parsedHeader.kind === 'numbered'; // Keeps only A-I numbered assessment columns.
+            }); // Restricts retained source columns to numbered A-I assessment headers.
+            const sortedAssessmentNumberedHeaders = sortAssessmentHeaders(assessmentNumberedHeaders); // Orders retained numbered headers by section letter and numeric index.
+            const letterBuckets = new Map(); // Prepares grouped headers for per-letter total calculation.
+            for (const headerName of sortedAssessmentNumberedHeaders) {
+              const parsedHeader = parseAssessmentHeader(headerName); // Parses the sorted header to discover its assessment letter.
+              if (!parsedHeader || parsedHeader.kind !== 'numbered') continue; // Guards against unexpected malformed headers.
+              if (!letterBuckets.has(parsedHeader.letter)) letterBuckets.set(parsedHeader.letter, []); // Initializes a bucket for the current assessment letter.
+              letterBuckets.get(parsedHeader.letter).push(headerName); // Adds the header to its letter bucket for average computation.
+            }
+
+            const computedSectionStatHeaders = []; // Tracks generated section statistic headers so they can be appended in sorted order.
+            for (const [letterKey, columnNames] of letterBuckets.entries()) { // Processes each grouped letter along with the headers that share its prefix.
+              if (columnNames.length === 0) continue; // Ignores unexpectedly empty groups to avoid dividing by zero.
+              const statHeaders = [`${letterKey}-Mean`, `${letterKey}-Median`, `${letterKey}-Min`, `${letterKey}-Max`, `${letterKey}-StdDev`]; // Defines all section-level statistic headers for this letter group.
+              computedSectionStatHeaders.push(...statHeaders); // Stores generated section statistic headers for final output ordering.
+              for (const row of filteredRows) { // Iterates through every row to compute the average contribution for the grouped columns.
+                const values = columnNames.map(colName => row[colName]); // Collects all raw values contributing to this section's statistics.
+                const stats = computeStats(values); // Computes mean, median, min, max, and population standard deviation for the section.
+                row[`${letterKey}-Mean`] = stats.mean; // Stores the section mean statistic.
+                row[`${letterKey}-Median`] = stats.median; // Stores the section median statistic.
+                row[`${letterKey}-Min`] = stats.min; // Stores the section minimum statistic.
+                row[`${letterKey}-Max`] = stats.max; // Stores the section maximum statistic.
+                row[`${letterKey}-StdDev`] = stats.stdDev; // Stores the section population standard deviation statistic.
+              } // Ends the per-row computation for the current letter bucket.
+            } // Finalizes the creation of section statistics for A-I letter groups.
+
+            // Computes cross-section statistics using only original numbered A-I fields (excluding section statistic columns).
+            for (const row of filteredRows) {
+              const allValues = sortedAssessmentNumberedHeaders.map(colName => row[colName]); // Collects all numbered A-I values for overall statistics.
+              const allStats = computeStats(allValues); // Computes overall mean, median, min, max, and population standard deviation.
+              row['All-Mean'] = allStats.mean; // Stores overall mean across all numbered A-I columns.
+              row['All-Median'] = allStats.median; // Stores overall median across all numbered A-I columns.
+              row['All-Min'] = allStats.min; // Stores overall minimum across all numbered A-I columns.
+              row['All-Max'] = allStats.max; // Stores overall maximum across all numbered A-I columns.
+              row['All-StdDev'] = allStats.stdDev; // Stores overall population standard deviation across all numbered A-I columns.
+            }
+
+            const finalHeaders = []; // Defines the exact header order that should survive preprocessing.
+            if (hasFirst || hasLast) finalHeaders.push('Full Name'); // Keeps Full Name as a special exception to the A-I allowlist.
+            finalHeaders.push(...sortedAssessmentNumberedHeaders); // Retains only A-I numbered assessment columns from the source file.
+            finalHeaders.push(...sortAssessmentHeaders(computedSectionStatHeaders)); // Appends generated section statistics in the same A-I order.
+            finalHeaders.push('All-Mean', 'All-Median', 'All-Min', 'All-Max', 'All-StdDev'); // Appends overall statistics after section-level metrics.
+
+            const cleanedRows = filteredRows.map(r => {
+              const obj = {}; // Prepares a new object limited to headers that still contain data.
+              for (const h of finalHeaders) obj[h] = r[h] !== undefined ? r[h] : ''; // Copies values for each retained header, defaulting missing entries to empty strings.
+              obj.__isClassMetricRow = false; // Marks this row as a student-level row so student views can exclude generated class rows.
+              return obj; // Returns the cleaned row object.
+            }); // Ends the transformation that strips all non-allowlisted columns.
+            const classMetricSourceHeaders = sortAssessmentHeaders(finalHeaders.filter(isClassMetricSourceHeader)); // Selects only A-I numbered and A-I mean columns as class-metric row sources.
+            const classMetricValues = {}; // Maps generated class metric row names (for example, "A-1-Mean") to numeric values.
+            const classMetricRows = []; // Stores generated class-metric rows that are appended after student rows.
+            const hasFullNameColumn = finalHeaders.includes('Full Name'); // Tracks whether Full Name exists so generated class rows can carry readable row keys.
+            for (const sourceHeader of classMetricSourceHeaders) { // Iterates through each class-metric source column.
+              const sourceValues = cleanedRows.map(row => row[sourceHeader]); // Collects all student values for this source column.
+              const sourceStats = computeStats(sourceValues); // Computes class-level descriptive statistics across student responses.
+              const metricsByName = {Mean: sourceStats.mean, Median: sourceStats.median, Min: sourceStats.min, Max: sourceStats.max, StdDev: sourceStats.stdDev}; // Aligns computed values with required suffix labels.
+              for (const metricName of CLASS_METRIC_NAMES) { // Builds one generated class row per metric type for this source column.
+                const classMetricKey = `${sourceHeader}-${metricName}`; // Produces row names like "A-1-Mean" and "A-Mean-StdDev".
+                const classRow = {}; // Starts a row object containing only retained headers.
+                for (const h of finalHeaders) classRow[h] = ''; // Initializes all retained columns as blank because each class row populates one source column only.
+                classRow[sourceHeader] = metricsByName[metricName]; // Places the generated metric value under its matching source column.
+                if (hasFullNameColumn) classRow['Full Name'] = classMetricKey; // Stores the generated row key as a label without calculating any Full Name statistic.
+                classRow.__isClassMetricRow = true; // Marks the row so student outputs can exclude it while class outputs include it.
+                classRow.__classMetricKey = classMetricKey; // Stores the canonical class metric row key for lookup.
+                classMetricRows.push(classRow); // Adds the generated class row to the per-file collection.
+                classMetricValues[classMetricKey] = metricsByName[metricName]; // Saves the generated value for direct class table/graph lookups.
+              }
+            }
+            const rowsWithClassMetrics = cleanedRows.concat(classMetricRows); // Appends generated class rows after student rows as requested.
+            const parsedName = parseFileNameKey(f.name); // Parses the filename to collect metadata for ordering and display.
+            filesData.set(f.name, { filename: f.name, headers: finalHeaders, rows: rowsWithClassMetrics, classRows: classMetricRows, classMetricValues, classMetricSourceHeaders, originalHeader: rawHeader, parsedName }); // Stores processed rows plus generated class metrics keyed by the original filename.
+            res(); // Resolves the promise to indicate the file finished processing successfully.
+          } catch(err) { console.error(err); rej(err); } // Logs unexpected errors and rejects the promise to surface issues.
+        }, // Ends the completion callback from PapaParse once a file is parsed.
+        error: function(err) { rej(err); } // Propagates parsing errors by rejecting the promise.
+      }); // Configures PapaParse with handlers and options for processing the file.
+    }); // Wraps PapaParse in a promise so the caller can await sequential processing.
+  }
+} // Ends the asynchronous routine that imports and cleans uploaded CSV files.
+
+// Retrieves rows from a file dataset that satisfy the current filter selection.
+function getRowsForActiveFilter(data, filterCol, filterVal) {
+  if (!data) return []; // Immediately returns an empty array when file data is missing.
+  const studentRows = data.rows.filter(r => !isClassMetricRow(r)); // Keeps only original student rows for student-level filtering and rendering.
+  if (!filterCol || !filterVal) return studentRows; // Returns all student rows unchanged when no filter is active.
+  return studentRows.filter(r => { // Filters the student rows to those matching the normalized filter criteria.
+    const v = (r[filterCol] || '').toString().trim().toLowerCase(); // Normalizes the value from the filter column for comparison.
+    return v === filterVal; // Keeps the row only when the normalized value equals the requested filter value.
+  }); // Ends the filtering operation that produces the rows respecting the active filter.
+} // Closes the helper that centralizes filtered row retrieval.
+
+// Builds and renders a comparison table using the provided file order and selected fields.
+function renderTable(order, fields) {
+  clearResultsView(); // Clears any previous output before drawing the new table.
+  resultsDiv.dataset.view = 'table'; // Marks the current output mode for styling hooks.
+  const table = document.createElement('table'); // Creates the table element that will contain the comparison grid.
+  const thead = document.createElement('thead'); // Creates the table header section.
+  const thr = document.createElement('tr'); // Creates the header row that will contain column titles.
+  const corner = document.createElement('th'); // Creates the corner cell labeling the row headers.
+  corner.textContent = 'Field \\ File'; // Labels the corner cell to describe the table layout.
+  thr.appendChild(corner); // Adds the corner header cell to the header row.
+  for (const k of order) {
+    const th = document.createElement('th'); // Creates a header cell for the current file.
+    th.textContent = k; // Displays the filename as the column label.
+    thr.appendChild(th); // Adds the header cell to the header row.
+  }
+  thead.appendChild(thr); // Inserts the assembled header row into the table header section.
+  table.appendChild(thead); // Attaches the header section to the table.
+  const tbody = document.createElement('tbody'); // Creates the body section where field data will appear.
+
+  const filterCol = FIXED_FILTER_COLUMN; // Uses Full Name as the fixed filter column for table rendering.
+  const filterVal = (columnValue.value||"").trim().toLowerCase(); // Retrieves and normalizes the filter value for case-insensitive comparisons.
+
+  for (const field of fields) {
+    const tr = document.createElement('tr'); // Creates a row representing the current field across files.
+    const rlabel = document.createElement('td'); // Creates the cell that labels the field name.
+    rlabel.textContent = field; // Displays the field name in the row header cell.
+    tr.appendChild(rlabel); // Adds the field label cell to the row.
+    for (const k of order) {
+      const td = document.createElement('td'); // Creates a data cell for the current file and field.
+      const d = filesData.get(k); // Retrieves the parsed data for the current file.
+      if (!d) { td.textContent=''; tr.appendChild(td); continue; } // Handles missing file data gracefully by leaving the cell empty.
+      if (!d.headers.includes(field)) { td.textContent=''; tr.appendChild(td); continue; } // Leaves the cell empty if the field does not exist in the file.
+      const rowsToUse = getRowsForActiveFilter(d, filterCol, filterVal); // Retrieves the subset of rows that honor the active filter.
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed field values from the filtered rows, removing empties.
+      const unique = Array.from(new Set(values)); // Removes duplicates so repeated answers appear only once.
+      td.textContent = unique.join(' | '); // Displays the unique values separated by pipes for readability.
+      if (shouldHighlightStudentField(k, field)) td.classList.add('metric-highlight-cell'); // Highlights mapped assessment groups for this file's course code.
+      tr.appendChild(td); // Adds the populated cell to the current row.
+    }
+    tbody.appendChild(tr); // Inserts the completed field row into the table body.
+  }
+  table.appendChild(tbody); // Attaches the body containing all field rows to the table.
+  const exportBtn = document.createElement('button'); // Creates a button allowing the user to download the table data.
+  exportBtn.textContent = 'Export table as CSV'; // Labels the export button to clarify its action.
+  exportBtn.addEventListener('click', ()=> {
+    const csv = tableToCSV(order, fields); // Converts the rendered table data back into CSV format.
+    const rawName = (columnValue.value || '').trim(); // Reads the current filter text so it can serve as the suggested file name.
+    const sanitizedBase = rawName.replace(/[^a-z0-9_\-]+/gi, '_'); // Replaces characters that might be invalid in filenames with underscores.
+    const baseName = sanitizedBase.length > 0 ? sanitizedBase : 'table_export_v3'; // Falls back to a stable name when the user input is empty or sanitizes to nothing.
+    downloadText(csv, `${baseName}.csv`); // Initiates a download of the generated CSV file using the computed default name.
+  }); // Ends the click handler that exports the table data.
+  const container = document.createElement('section'); // Creates a wrapper section to hold table output controls.
+  container.className = 'result-section'; // Applies a shared output shell style.
+  const toolbar = document.createElement('div'); // Creates a toolbar row for output actions.
+  toolbar.className = 'result-toolbar'; // Applies toolbar spacing and alignment.
+  toolbar.appendChild(exportBtn); // Places export action inside the toolbar.
+  const tableWrap = document.createElement('div'); // Creates a scroll wrapper to support sticky headers.
+  tableWrap.className = 'result-table-wrap'; // Applies result table container styling.
+  tableWrap.appendChild(table); // Adds table inside the scroll wrapper.
+  container.appendChild(toolbar); // Inserts toolbar before data content.
+  container.appendChild(tableWrap); // Adds the styled table wrapper.
+  resultsDiv.appendChild(container); // Displays the assembled table and export control in the results area.
+} // Ends the function that renders the comparison table.
+
+// Converts the currently selected table data into a CSV string for export.
+function tableToCSV(order, fields) {
+  const lines=[]; // Will gather each CSV row as a string.
+  const header=['Field/File', ...order]; // Defines the CSV header row combining the field label column with file columns.
+  lines.push(header.map(csvEscape).join(',')); // Adds the escaped header row to the CSV output.
+  const filterCol = FIXED_FILTER_COLUMN; // Uses Full Name as the fixed filter column for CSV export.
+  const filterVal = (columnValue.value||"").trim().toLowerCase(); // Retrieves the normalized filter value for consistent matching.
+  for (const field of fields) {
+    const row=[field]; // Starts a CSV row with the field name as the first column.
+    for (const k of order) {
+      const d = filesData.get(k); // Retrieves data for the current file column.
+      if (!d || !d.headers.includes(field)) { row.push(''); continue; } // Inserts an empty value if the file lacks the field.
+      const rowsToUse = getRowsForActiveFilter(d, filterCol, filterVal); // Obtains only the rows consistent with the active filter settings.
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed field values from the filtered rows, excluding blanks.
+      const unique = Array.from(new Set(values)); // Removes duplicate entries so the CSV mirrors the on-screen table.
+      row.push(unique.join(' | ')); // Appends the combined unique values to the CSV row.
+    }
+    lines.push(row.map(csvEscape).join(',')); // Adds the assembled row to the CSV output after escaping.
+  }
+  return lines.join('\n'); // Joins all rows with newline separators to produce the final CSV string.
+} // Ends the helper that serializes table data into CSV.
+function csvEscape(s) {
+  if (s==null) return ''; // Treats null or undefined values as empty strings in CSV output.
+  s=String(s); // Ensures the value is a string before inspection.
+  if (s.includes(',')||s.includes('"')||s.includes('\n')) return '"' + s.replace(/"/g,'""') + '"'; // Surrounds strings containing special characters with quotes and escapes internal quotes.
+  return s; // Returns the value unchanged when no escaping is needed.
+} // Ends the CSV escaping utility.
+function downloadText(text, filename) {
+  const blob = new Blob([text], {type:'text/csv'}); // Creates a Blob object containing the CSV text with the appropriate MIME type.
+  const url = URL.createObjectURL(blob); // Generates a temporary URL pointing to the blob data for download.
+  const a=document.createElement('a'); // Creates a temporary anchor element to trigger the download.
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); // Configures, triggers, and cleans up the download link to save the file.
+  setTimeout(()=>URL.revokeObjectURL(url),1000); // Revokes the object URL after a short delay to free browser resources.
+} // Ends the helper that downloads generated text content as a file.
+
+// Builds and renders the class-level comparison table using generated class metric rows only.
+function renderClassTable(order, classMetricRows) {
+  clearResultsView(); // Clears any previous output before drawing the class table.
+  resultsDiv.dataset.view = 'class-table'; // Marks the current output mode for styling hooks.
+  const table = document.createElement('table'); // Creates the table element used to display class metric rows by file.
+  const thead = document.createElement('thead'); // Creates the header section for the class table.
+  const thr = document.createElement('tr'); // Creates the top header row.
+  const corner = document.createElement('th'); // Creates the corner header cell labeling row names.
+  corner.textContent = 'Class Metric \\ File'; // Labels the row axis for generated class metric entries.
+  thr.appendChild(corner); // Adds the corner header to the header row.
+  for (const k of order) {
+    const th = document.createElement('th'); // Creates a header cell for the current file column.
+    th.textContent = k; // Displays the filename at the top of the column.
+    thr.appendChild(th); // Adds the file header cell to the header row.
+  }
+  thead.appendChild(thr); // Finishes the header row assembly.
+  table.appendChild(thead); // Attaches the header to the class table.
+
+  const tbody = document.createElement('tbody'); // Creates the body section where class metric values are rendered.
+  for (const classMetricRowKey of classMetricRows) {
+    const tr = document.createElement('tr'); // Creates one row per generated class metric key.
+    const rowLabel = document.createElement('td'); // Creates the row label cell.
+    rowLabel.textContent = classMetricRowKey; // Shows row keys like "A-1-Mean" and "A-Mean-StdDev".
+    tr.appendChild(rowLabel); // Adds the row label cell.
+    for (const k of order) {
+      const td = document.createElement('td'); // Creates a value cell for this file and class metric row.
+      const d = filesData.get(k); // Retrieves processed file data for lookup.
+      const value = getClassMetricValueForFile(d, classMetricRowKey); // Reads the generated class value for this row key.
+      td.textContent = value === null ? '' : formatMetricValue(value); // Displays the formatted metric value when available.
+      if (shouldHighlightClassMetricRow(k, classMetricRowKey)) td.classList.add('metric-highlight-cell'); // Highlights mapped class-metric cells per file and source-letter rules.
+      tr.appendChild(td); // Adds the populated value cell to the row.
+    }
+    tbody.appendChild(tr); // Adds the completed metric row to the table body.
+  }
+  table.appendChild(tbody); // Attaches the completed body section to the table.
+
+  const exportBtn = document.createElement('button'); // Creates a CSV export button for class table output.
+  exportBtn.textContent = 'Export class table as CSV'; // Labels the class export action clearly.
+  exportBtn.addEventListener('click', ()=> {
+    const csv = classTableToCSV(order, classMetricRows); // Serializes the class table data into CSV format.
+    downloadText(csv, 'class_table_export_v3.csv'); // Triggers download with a deterministic class-oriented filename.
+  }); // Ends the click handler that exports class table content.
+
+  const container = document.createElement('section'); // Wraps export controls and table in a styled output block.
+  container.className = 'result-section'; // Applies shared result shell styling.
+  const toolbar = document.createElement('div'); // Creates a toolbar row for output actions.
+  toolbar.className = 'result-toolbar'; // Applies toolbar alignment and spacing.
+  toolbar.appendChild(exportBtn); // Places export control in the toolbar.
+  const tableWrap = document.createElement('div'); // Creates a scroll wrapper for sticky class-table headers.
+  tableWrap.className = 'result-table-wrap'; // Applies table wrapper styling.
+  tableWrap.appendChild(table); // Places class table inside wrapper.
+  container.appendChild(toolbar); // Adds toolbar above table content.
+  container.appendChild(tableWrap); // Adds class table content block.
+  resultsDiv.appendChild(container); // Displays the class table in the results area.
+} // Ends the class table renderer.
+
+// Converts generated class metric table content to CSV.
+function classTableToCSV(order, classMetricRows) {
+  const lines = []; // Collects rows of CSV output.
+  const header = ['Class Metric/File', ...order]; // Builds the CSV header from row label and file columns.
+  lines.push(header.map(csvEscape).join(',')); // Adds escaped header row.
+  for (const classMetricRowKey of classMetricRows) {
+    const row = [classMetricRowKey]; // Starts a row with the generated class metric key.
+    for (const k of order) {
+      const d = filesData.get(k); // Retrieves data for the file column.
+      const value = getClassMetricValueForFile(d, classMetricRowKey); // Looks up generated class metric value for this file.
+      row.push(value === null ? '' : formatMetricValue(value)); // Writes formatted metric values to CSV.
+    }
+    lines.push(row.map(csvEscape).join(',')); // Adds escaped CSV row.
+  }
+  return lines.join('\n'); // Combines all rows into final CSV text.
+} // Ends the helper that serializes class table data.
+
+// Renders class-level graphs using generated class metric rows only.
+function renderClassGraphs(order, classMetricRows) {
+  clearResultsView(); // Clears previous output before drawing class graphs.
+  resultsDiv.dataset.view = 'class-graph'; // Marks the current output mode for styling hooks.
+  const container = document.createElement('section'); // Wraps graphs in a styled result shell.
+  container.className = 'result-section'; // Applies shared results styling.
+  const graphsWrap=document.createElement('div'); graphsWrap.className='graphs'; // Creates the grid container that holds all class graph cards.
+  for (const classMetricRowKey of classMetricRows) {
+    const card=document.createElement('div'); card.className='graph-card'; // Creates a card for this class metric graph.
+    const title=document.createElement('p'); title.className='graph-title'; title.textContent=classMetricRowKey; card.appendChild(title); // Displays the class metric row key as the chart title.
+    const canvas=document.createElement('canvas'); canvas.style.maxWidth='100%'; card.appendChild(canvas); // Creates the canvas where Chart.js will render.
+    graphsWrap.appendChild(card); // Adds the class graph card to the graph grid.
+
+    const labels=[]; const dataVals=[]; const meta=[]; const barBackgroundColors=[]; const barBorderColors=[]; // Collects labels, values, tooltip metadata, and per-bar highlight colors for the chart.
+    for (const k of order) {
+      labels.push(k); // Adds the file name to x-axis labels.
+      const shouldHighlight = shouldHighlightClassMetricRow(k, classMetricRowKey); // Determines whether this file's bar should use highlight styling.
+      barBackgroundColors.push(shouldHighlight ? GRAPH_BAR_HIGHLIGHT_BACKGROUND : GRAPH_BAR_DEFAULT_BACKGROUND); // Sets bar fill color according to highlight status.
+      barBorderColors.push(shouldHighlight ? GRAPH_BAR_HIGHLIGHT_BORDER : GRAPH_BAR_DEFAULT_BORDER); // Sets bar border color according to highlight status.
+      const d = filesData.get(k); // Retrieves processed file data.
+      const value = getClassMetricValueForFile(d, classMetricRowKey); // Reads the generated class metric value for this file.
+      if (value === null) { dataVals.push(null); meta.push({type:'missing'}); continue; } // Marks missing generated values as empty bars.
+      const numeric = Number(value); // Converts value to number for graph plotting.
+      if (Number.isNaN(numeric)) { dataVals.push(null); meta.push({type:'non-numeric'}); continue; } // Guards against unexpected non-numeric values.
+      dataVals.push(Number.parseFloat(numeric.toFixed(4))); // Adds rounded numeric value for plotting.
+      meta.push({type:'numeric'}); // Records metadata for tooltip text.
+    }
+    new Chart(canvas, { type:'bar', data:{labels, datasets:[{label:classMetricRowKey, data:dataVals, backgroundColor:barBackgroundColors, borderColor:barBorderColors, borderWidth:1.5}]}, options:{
+      responsive:true, scales:{x:{title:{display:true,text:'Files'}}, y:{title:{display:true,text:'Value'}, beginAtZero:true}}, // Configures axis labels and baseline behavior.
+      plugins:{
+        legend:{display:false}, // Hides legend since title already identifies each chart.
+        tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `value = ${context.formattedValue}`; if(m.type==='missing') return 'no class metric row'; if(m.type==='non-numeric') return 'non-numeric value'; return context.formattedValue; }}} // Explains exact value status in tooltips for each bar.
+      }
+    }}); // Creates and renders the class metric chart.
+  }
+  container.appendChild(graphsWrap); // Adds the graph grid inside the result shell.
+  resultsDiv.appendChild(container); // Displays all generated class graphs in the results area.
+} // Ends the class graph renderer.
+
+// Creates graphs summarizing field values across files based on the selected ordering and fields.
+function renderGraphs(order, fields) {
+  clearResultsView(); // Clears previous results before drawing graphs.
+  resultsDiv.dataset.view = 'graph'; // Marks the current output mode for styling hooks.
+  const container = document.createElement('section'); // Wraps graphs in a styled result shell.
+  container.className = 'result-section'; // Applies shared results styling.
+  const graphsWrap=document.createElement('div'); graphsWrap.className='graphs'; // Creates a container for all graph cards and applies styling.
+  const filterCol = FIXED_FILTER_COLUMN; // Uses Full Name as the fixed filter column for graph rendering.
+  const filterVal = (columnValue.value||"").trim().toLowerCase(); // Normalizes the filter value for consistent comparisons just like the table view uses.
+  for (const field of fields) {
+    const card=document.createElement('div'); card.className='graph-card'; // Builds a card element to house each individual chart.
+    const title=document.createElement('p'); title.className='graph-title'; title.textContent=field; card.appendChild(title); // Adds a title showing the field being visualized.
+    const canvas=document.createElement('canvas'); canvas.style.maxWidth='100%'; card.appendChild(canvas); // Creates a canvas for Chart.js to render into and constrains its width.
+    graphsWrap.appendChild(card); // Adds the completed card to the graphs container.
+    const labels=[]; const dataVals=[]; const meta=[]; const barBackgroundColors=[]; const barBorderColors=[]; // Prepares labels, data points, metadata, and per-bar highlight colors.
+    for (const k of order) {
+      labels.push(k); // Adds the filename to the chart labels array.
+      const shouldHighlight = shouldHighlightStudentField(k, field); // Determines whether this file-field pair should render as highlighted.
+      barBackgroundColors.push(shouldHighlight ? GRAPH_BAR_HIGHLIGHT_BACKGROUND : GRAPH_BAR_DEFAULT_BACKGROUND); // Applies green fill only for mapped highlighted bars.
+      barBorderColors.push(shouldHighlight ? GRAPH_BAR_HIGHLIGHT_BORDER : GRAPH_BAR_DEFAULT_BORDER); // Applies matching border color for highlighted bars.
+      const d = filesData.get(k); // Retrieves parsed data for the current file.
+      if (!d || !d.headers.includes(field)) { dataVals.push(null); meta.push({type:'missing'}); continue;} // Records a null data point when the field is absent and notes the missing status.
+      const rowsToUse = getRowsForActiveFilter(d, filterCol, filterVal); // Reuses the shared helper to respect the active filter before aggregating values.
+      const values = rowsToUse.map(r => (r[field] !== undefined ? String(r[field]).trim() : '')).filter(v=>v!==''); // Collects trimmed values for the field from the filtered rows only.
+      if (values.length===0) { dataVals.push(null); meta.push({type:'empty'}); continue; } // Marks the data as empty when no non-blank values exist after filtering.
+      const numeric = values.map(v=>Number(v)).filter(v=>!Number.isNaN(v)); // Attempts to convert all values to numbers, keeping only valid conversions.
+      if (numeric.length===values.length) {
+        const avg = numeric.reduce((a,b)=>a+b,0)/numeric.length; // Computes the average of numeric values when all entries are numeric.
+        dataVals.push(Number.parseFloat(avg.toFixed(4))); meta.push({type:'numeric',agg:'avg'}); // Stores the average value with limited precision and notes the aggregation method.
+      } else { dataVals.push(values.length); meta.push({type:'non-numeric',agg:'count'}); } // Counts non-numeric responses and records that count aggregation was used.
+    }
+    new Chart(canvas, { type:'bar', data:{labels, datasets:[{label:field, data:dataVals, backgroundColor:barBackgroundColors, borderColor:barBorderColors, borderWidth:1.5}]}, options:{
+      responsive:true, scales:{x:{title:{display:true,text:'Files'}}, y:{title:{display:true,text:'Value'}, beginAtZero:true}}, // Configures axes titles, responsiveness, and baseline behavior for the chart.
+      plugins:{ // Introduces plugin-level configuration for the chart instance.
+        legend:{display:false}, // Hides the legend so the clickable text that toggled dataset visibility is removed.
+        tooltip:{ callbacks:{ label:function(context){ const idx=context.dataIndex; const m=meta[idx]; if(!m) return context.formattedValue; if(m.type==='numeric') return `avg = ${context.formattedValue}`; if(m.type==='non-numeric') return `count = ${context.formattedValue}`; if(m.type==='empty') return `no data`; if(m.type==='missing') return `field not present`; return context.formattedValue; }}} // Customizes tooltip text to explain how each bar's value was derived.
+      } // Ends the plugins configuration block now that the legend is hidden and tooltips customized.
+    }}); // Instantiates a new Chart.js bar chart with the prepared data and configuration.
+  }
+  container.appendChild(graphsWrap); // Adds graph grid inside the result shell.
+  resultsDiv.appendChild(container); // Displays the collection of graphs in the results area.
+} // Ends the function that renders graphs for selected fields.
+
+// Attach create buttons after functions declared
+createTableBtn.addEventListener('click', ()=> {
+  const matchedOrder = getMatchedFilesForCurrentFullName(); // Resolves matched files directly from current Full Name input.
+  if (!matchedOrder || matchedOrder.length === 0) return; // Stops if validation fails or no matches are found.
+  const selected = getAutoSelectedFields(matchedOrder); // Derives automatic row selection from currently matched files.
+  if (selected.length === 0) { alert('No assessment rows available for matched files.'); return; } // Ensures at least one assessment row exists before building a table.
+  renderTable(matchedOrder, selected); // Generates the table using deterministic matched-file ordering.
+}); // Ends the click handler that builds tables.
+createGraphBtn.addEventListener('click', ()=> {
+  const matchedOrder = getMatchedFilesForCurrentFullName(); // Resolves matched files directly from current Full Name input.
+  if (!matchedOrder || matchedOrder.length === 0) return; // Stops if validation fails or no matches are found.
+  const selected = getAutoSelectedFields(matchedOrder); // Derives automatic row selection from currently matched files.
+  if (selected.length === 0) { alert('No assessment rows available for matched files.'); return; } // Requires at least one assessment row to build graphs.
+  renderGraphs(matchedOrder, selected); // Produces graphs using deterministic matched-file ordering.
+}); // Ends the click handler that builds graphs.
+createClassTableBtn.addEventListener('click', ()=> {
+  if (filesData.size === 0) { alert('Upload files first.'); return; } // Prevents class table generation before preprocessing completes.
+  const order = getOrderForAllFiles(); // Uses all uploaded files for class-level output regardless of student filtering.
+  const selectedClassRows = getAutoSelectedClassMetricRows(order); // Derives generated class metric row names from all uploaded files.
+  if (selectedClassRows.length === 0) { alert('No class metric rows available for uploaded files.'); return; } // Guards against empty class metric data.
+  renderClassTable(order, selectedClassRows); // Renders only generated class metric rows in tabular form.
+}); // Ends the click handler that builds class tables.
+createClassGraphBtn.addEventListener('click', ()=> {
+  if (filesData.size === 0) { alert('Upload files first.'); return; } // Prevents class graph generation before preprocessing completes.
+  const order = getOrderForAllFiles(); // Uses all uploaded files for class-level output regardless of student filtering.
+  const selectedClassRows = getAutoSelectedClassMetricRows(order); // Derives generated class metric row names from all uploaded files.
+  if (selectedClassRows.length === 0) { alert('No class metric rows available for uploaded files.'); return; } // Guards against empty class metric data.
+  renderClassGraphs(order, selectedClassRows); // Renders graphs only for generated class metric rows.
+}); // Ends the click handler that builds class graphs.
+downloadProcessedCsvBtn.addEventListener('click', ()=> {
+  if (filesData.size === 0) { alert('Upload files first.'); return; } // Prevents single-file export when nothing has been processed.
+  const selectedFile = (processedFileSelect.value || '').trim(); // Reads selected filename from the processed file dropdown.
+  if (!selectedFile) { alert('Select a processed file to download.'); return; } // Requires explicit file selection.
+  const data = filesData.get(selectedFile); // Retrieves processed data for the selected file.
+  if (!data) { alert('Selected file is not available.'); return; } // Handles stale selections defensively.
+  const csv = processedDataToCSV(data); // Builds CSV text from the processed dataset.
+  downloadText(csv, getProcessedExportFileName(selectedFile)); // Downloads the selected processed CSV file.
+}); // Ends the click handler that downloads a selected processed file.
+downloadAllProcessedCsvBtn.addEventListener('click', async ()=> {
+  if (filesData.size === 0) { alert('Upload files first.'); return; } // Prevents ZIP creation when no processed files exist.
+  if (typeof JSZip === 'undefined') { alert('ZIP library is unavailable. Refresh and try again.'); return; } // Fails gracefully if JSZip did not load.
+  try {
+    const zip = new JSZip(); // Creates the ZIP archive container.
+    const sortedKeys = getSortedFileKeys(Array.from(filesData.keys())); // Uses deterministic ordering for archive entries.
+    for (const fname of sortedKeys) { // Adds each processed CSV file to the ZIP archive.
+      const data = filesData.get(fname); // Retrieves processed dataset for the current file.
+      if (!data) continue; // Skips unexpectedly missing entries defensively.
+      zip.file(getProcessedExportFileName(fname), processedDataToCSV(data)); // Writes processed CSV content to the ZIP archive.
+    }
+    if (Object.keys(zip.files).length === 0) { alert('No processed files available to download.'); return; } // Handles unexpected empty archive state.
+    const zipBlob = await zip.generateAsync({type:'blob'}); // Generates ZIP binary data in the browser.
+    downloadBlob(zipBlob, 'processed_csvs.zip'); // Triggers download of all processed CSVs as a single ZIP file.
+  } catch (err) {
+    console.error(err); // Logs unexpected ZIP generation errors for debugging.
+    alert('Failed to create ZIP file.'); // Informs the user if ZIP export fails.
+  }
+}); // Ends the click handler that downloads all processed files as ZIP.
+</script> <!-- Closes the script block containing all application logic. -->
+</body> <!-- Ends the visible body content of the page. -->
+</html> <!-- Closes the root HTML element, completing the document structure. -->
